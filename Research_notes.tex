@@ -1,0 +1,22 @@
+\documentclass[]{report}
+
+
+% Title Page
+\title{Lessons learned at LLNL}
+\author{Zachary Matheson}
+
+
+\begin{document}
+\maketitle
+
+\section*{Nucleon localization function}
+\subsection*{\date{1 March 2017}}
+Most recently I tried using Erik's modified version of HFBTHO to run for several constraints along $Q_{30}$ (or anywhere, really). What I'd like to do is use HFBTHO to generate densities quickly for $^{176}$Pt between $Q_{20}=241$ and $Q_{20}\approx 300$, and at $Q_{30}=4, 18$ (something I decided semi-arbitrarily once upon a time). I'm putting that on hold for a bit while I work on this inertia thing. Erik sent me some notes for perhaps getting the code to do what I want it to do, which are in my email. The files are currently in /p/lscratchh/matheson/locali-176Pt/hfbtho (/erik for testing his version of the code). Another thought I had was to try constraining $Q_{40}$ to something reasonable, and then releasing that constraint to find the actual density (hopefully) nearby.
+
+\section*{\date{1 March 2017}}
+\subsection*{Impact of basis deformation on EHFB}
+We wanted to see how much the observables of the system would change if we used a single HO basis across an entire PES. This is based on a misunderstanding I had of something Jhilam said, where in order to use his inertia code, you need adjacent points to have the same basis deformation and other basis properties (so that you can numerically take derivatives of the densities at those points). It turns out he gets around this problem by changing the basis every 30b along Q20, but all the same we thought it would be good to check the dependence of system observables on the basis, especially since the half-life is so dependent on small deviations in the potential energy (a change of 1 MeV can affect the half-life by orders of magnitude).
+
+To test, I took three points on the PES I had generated for $^{294}$Og: (-14, 0), (72, 0), and (148, 28). According to the output file, the basis deformation chosen for each of these (by the automatic basis setting routine in HFODD) was, respectively, AL20 = 0.187, 0.424, and 0.608. I took those record files and used them to restart a new calculation, this time with the basis deformation set uniformly to AL20 = 0.61 (and AL40 = 0.10). The superdeformed asymettric shape was, understandably, least affected by the change, with the kinetic energy varying by about 3 MeV but the total energy varying by only about 0.14 MeV (-2085.878548 vs -2086.012955). Quasiparticle and canonical single-particle states were nearly identical, and fragment properties were almost the same (except for the interaction energies, which were quite different). The elongated symmetric shape differed by about 0.6 Mev (-2080.815396 vs -2080.202346). The oblate ground state didn't converge in the allotted time, but based on its last iteration it was probably going to finish with an HFB energy around -2078.649984 (compared to -2080.263986 from before), a difference of about 1.6 MeV.
+
+\end{document}          
