@@ -32,4 +32,35 @@ Of course, to do that we'll need working inertia codes. Right now, I don't under
 
 $\mathtt{Intel MKL ERROR: Parameter 8 was incorrect on entry to ZGEMM}$
 
+\section*{6 March 2017}
+Today I worked on two computational problems: the large number of iterations, even for a small perturbation from the record file's original point; and benchmarking a working inertia calculation against Jhilam's results.
+
+For problem \#1, I noticed that even after setting the basis parameters manually in the input file, I was still seeing that a different basis was used during the run and [consequently?] these were still taking ~70-80 iterations to converge. I showed Nicolas and he had me flip a Lagrange multiplier continuation switch in the input file, but I've re-run the code since then and the problem still exists, that the new run uses a slightly different basis than the original. and it still takes ~70-80 iterations to converge.
+
+For problem \#2, I compiled the code for a 3D benchmarking run to compare with Jhilam's results. The code runs without that weird MKL error I was getting, but the results are incorrect.
+
+I'm getting:
+\begin{equation}
+   77.00\    1.00\    2.00\   -1801.146627 \\
+       0.000000\    0.598205\    0.598233\    0.000000\    0.000000\    0.598219
+\end{equation}
+whereas Jhilam is getting:
+\begin{equation}
+   77.00\    1.00\    2.00\   -1801.183 \\
+   0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
+\end{equation}
+
+\section*{7 March 2017}
+Today, after modifying the input file and doing some debugging, I'm getting:
+\begin{equation}
+    0.011378\    0.034354\    0.000000\   -0.001988\    0.000000\    0.000000
+\end{equation}
+\noindent which is within 0.001 across the board. So not bad, but not exact, either. My question now then is if this is something that should be exactly deterministic. I'd think that it should be, yes. The max basis size has changed at compile time but I don't think that affects the final results. $\Rightarrow$ Ah. I think the problem is that I changed the basis characteristics in the input file to HFODD. I calculated the surrounding points using the basis from the centerpoint. Which, I suppose is useful to know... In fact, yes, I did that because we need the basis to be the same, no? So in order to reproduce Jhilam's exact results, we'd need to know his exact basis.
+
+Pending that, I think I officially have a working inertia code. There are some nice things I can do to streamline inertia calculations, probably within Python as opposed to Fortran, but for now it's something to start with.
+
+I'm still not sure what's going on with the other thing, with the basis getting changed even after setting it manually. I even tried another run setting INPOME=0, just to see what would happen (even though I expected that to make it worse), and frankly I didn't see a difference (the output files reported the same wrong basis).
+
+When you come in tomorrow, the things to work on should be: 1) spend the morning working on deriving the ATDHFB inertia, then 2) in the afternoon, talk to Nicolas about the inertia code you got working (maybe Jhilam will have sent you a basis to use), and perhaps see if Nicolas has any additional insight on the basis problem you're seeing here.
+
 \end{document}          
