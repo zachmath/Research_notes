@@ -63,4 +63,40 @@ I'm still not sure what's going on with the other thing, with the basis getting 
 
 When you come in tomorrow, the things to work on should be: 1) spend the morning working on deriving the ATDHFB inertia, then 2) in the afternoon, talk to Nicolas about the inertia code you got working (maybe Jhilam will have sent you a basis to use), and perhaps see if Nicolas has any additional insight on the basis problem you're seeing here.
 
+\section*{8 March 2017}
+Good news: Nicolas figured out what was happening with the basis. Apparently there were rounding truncation errors that popped up when the parameters FCHOM0 and AL20 were written to file, and the line FREQBASIS isn't even read at all. Going back into the source and figuring out how FCHOM0 and AL20 were computed for the centerpoint, and plugging these values into the input file with lots of decimal points seems to have solved the problem. It still takes several iterations to converge, but it will hopefully be faster than before (it's still running so we'll see).
+
+The formulae you'll ultimately need to implement in your Python script for preserving the basis are the following:
+
+\begin{eqnarray}
+\omega_0        =& 0.1q_{20}e^{-0.02q_{20}}+6.5 \\
+\mathtt{FCHOM0} =& \frac{\omega_0}{\left(\frac{41}{A^\frac{1}{3}}\right)} \\
+\alpha          =& 0.05\sqrt{q_{20}}
+\end{eqnarray}
+\noindent where $q_{20}$ refers to the quadrupole deformation of the centerpoint.
+
+\section*{9 March 2017}
+Aha! Figured out what was causing the ZGEMM error in the inertia file. I was using a max basis size of 1200 when I compiled the inertia code (as defined in hfodd\_sizes\_....f90), but the particular matrices I was trying to multiply were created using a basis size of like 1600. So that's resolved. One thing, though, is that, while it gives the same results as the 3D case, they are in a different order. So that's something you should clean up in the code. 
+
+Additionally, I've redone the calculations for the inertia benchmark, this time using the correct basis and fixing whatever Lipkin-Nogami problem I was having, and this is what I get:
+\begin{equation}
+    0.011719\    0.034843\    8.287077\   -0.002180\   -0.054160\    0.020690
+\end{equation}
+\noindent Again, for reference, here are Jhilam's results:
+\begin{equation}
+   0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
+\end{equation}
+Without Jhilam's basis, we still don't have his result (in fact, it's even further than it was before). But the biggest problem is in that $\lambda$ variation somehow. Still not sure what's going on with that.
+
+Just judging from the outputs, it looks like everything converged properly and the results make sense (energies were approximately the same, particularly for those which did not explicitly involve pairing; unconstrained multipole moments are approximately the same as far as I can see). Could it be that I put the qp files out of order? I have the magnitudes right for sure (lambda changes by 0.01; the Lagrange coefficient magnitudes for equally-spaced grid points go as $\pm\frac{1}{2\delta q} = \frac{1}{50}$). I'm running it now with the signs switched, just in case I had them backwards somehow. 
+
+\begin{equation}
+    0.011719\    0.034843\    8.287077\   -0.002180\    0.054160\   -0.020690
+\end{equation}
+
+\noindent But if that doesn't work (which it didn't), then perhaps it's a problem related to the parameter I switched? Is there a modification to the formula when you change $\lambda$ instead of a multipole moment? Did I change the wrong $\lambda$? Was I only supposed to change $\lambda$ for protons $\mathit{or}$ neutrons but not both?
+
+\section*{10 March 2017}
+Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$, he would have used the basis corresponding to $Q_{20}=60$ (as far as FCHOM0 and $\alpha_{20}$ are defined). In general, his method is to round down to the nearest multiple of 30.
+
 \end{document}          
