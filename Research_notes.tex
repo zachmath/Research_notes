@@ -78,17 +78,17 @@ The formulae you'll ultimately need to implement in your Python script for prese
 \section*{9 March 2017}
 Aha! Figured out what was causing the ZGEMM error in the inertia file. I was using a max basis size of 1200 when I compiled the inertia code (as defined in hfodd\_sizes\_....f90), but the particular matrices I was trying to multiply were created using a basis size of like 1600. So that's resolved. One thing, though, is that, while it gives the same results as the 3D case, they are in a different order. So that's something you should clean up in the code. 
 
-Additionally, I've redone the calculations for the inertia benchmark, this time using the correct basis and fixing whatever Lipkin-Nogami problem I was having, and this is what I get:
+Additionally, I've redone the calculations for the inertia benchmark, this time using the correct basis for the points surrounding the center point, and fixing whatever Lipkin-Nogami problem I was having, and this is what I get:
 \begin{equation}
     0.011719\    0.034843\    8.287077\   -0.002180\   -0.054160\    0.020690
 \end{equation}
-\noindent Again, for reference, here are Jhilam's results:
+\noindent with $E_{HFB}=-1801.146627$ Again, for reference, here are Jhilam's results:
 \begin{equation}
    0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
 \end{equation}
 Without Jhilam's basis, we still don't have his result (in fact, it's even further than it was before). But the biggest problem is in that $\lambda$ variation somehow. Still not sure what's going on with that.
 
-Just judging from the outputs, it looks like everything converged properly and the results make sense (energies were approximately the same, particularly for those which did not explicitly involve pairing; unconstrained multipole moments are approximately the same as far as I can see). Could it be that I put the qp files out of order? I have the magnitudes right for sure (lambda changes by 0.01; the Lagrange coefficient magnitudes for equally-spaced grid points go as $\pm\frac{1}{2\delta q} = \frac{1}{50}$). I'm running it now with the signs switched, just in case I had them backwards somehow. 
+Just judging from the outputs, it looks like everything converged properly and the results make sense (energies were approximately the same, particularly for those which did not explicitly involve pairing; unconstrained multipole moments are approximately the same as far as I can see). Could it be that I put the qp files out of order? I have the magnitudes right for sure (lambda changes by 0.01; the Lagrange coefficient magnitudes for equally-spaced grid points go as $\pm\frac{1}{2\delta q} = \frac{1}{0.02}=50$). I'm running it now with the signs switched, just in case I had them backwards somehow. 
 
 \begin{equation}
     0.011719\    0.034843\    8.287077\   -0.002180\    0.054160\   -0.020690
@@ -97,6 +97,22 @@ Just judging from the outputs, it looks like everything converged properly and t
 \noindent But if that doesn't work (which it didn't), then perhaps it's a problem related to the parameter I switched? Is there a modification to the formula when you change $\lambda$ instead of a multipole moment? Did I change the wrong $\lambda$? Was I only supposed to change $\lambda$ for protons $\mathit{or}$ neutrons but not both?
 
 \section*{10 March 2017}
-Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$, he would have used the basis corresponding to $Q_{20}=60$ (as far as FCHOM0 and $\alpha_{20}$ are defined). In general, his method is to round down to the nearest multiple of 30.
+Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$, he would have used the basis corresponding to $Q_{20}=60$ (as far as FCHOM0 and $\alpha_{20}$ are defined). In general, his method is to round down to the nearest multiple of 30. With this I get:
+
+\begin{equation}
+    0.011663\    0.034763\    8.610518\   -0.002182\   -0.054110\    0.020785
+\end{equation}
+
+\noindent with $E_{HFB}=-1801.173695 MeV$
+
+\section*{13 March 2017}
+It seems there's no problem with the $\lambda$ terms in the inertia output (at least, not one unique to just the pairing terms).  The issue there is that Jhilam normalized his coordinates in the end, such that $\delta x=1$ for every collective coordinate instead of the $d\lambda=0.01$ I'm using. Since this only affects the denominator in my derivatives $\frac{\delta \rho}{\delta q}$, this means shifting the decimal point over by 2 slots (or 4 in the $\lambda-\lambda$ case) for the pairing terms.
+
+So it $\mathit{looks}$ like the inertia code is working. Everything is correct to within ~20\% compared to Jhilam's result. But it would be good to make absolutely sure, which means examining Jhilam's output files, if possible. 
+
+\section*{17 March 2017}
+The past couple days you've been working on parallelizing the inertia routine, and figuring out how to quickly setup runs for the "satellite" points on your PES. You've got some scripts that will help, although between writing them a couple days ago and using them now, it seems you've already sort of forgotten what they need to work - or rather, you see that they aren't quite as universal as you were hoping. You need an XML file, which needs output files. If you have a big XML file and need to split it up, you did that by hand today but I'm guessing there's an easier way. But it looks like you WILL need to do some splitting up. Not the way you had originally anticipated, where you submitted a job for every single point on the PES to have its satellites computed. But since the speedup for using nearby points only seems to occur when you use the same basis as the centerpoint, this means that you have to group centerpoints by $Q_{20}$. That'll reduce the number of jobs on Quartz by ~15, but it's still a nuisance.
+
+Anyway, you've done that for values of $Q_{20}$ between 0 and 8, and you're waiting for those to complete (hopefully they'll take less than 3hrs!). Once they do, you can test out your post-run\_whatever.py Python script to see if it really \textit{does} group things nicely. You should have it generate the inertia input file, with multipole moments, Lagrange coefficients, and file names correctly and automatically (it's mostly there already; I think you just need to add the multipole constraints). And then you can test out your MPI version of the inertia code. You've tested it and it works when compiled and run serially (at least, it gives the same results as before, which you'll assume are correct until you hear back from Jhilam).
 
 \end{document}          
