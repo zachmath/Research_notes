@@ -115,4 +115,48 @@ The past couple days you've been working on parallelizing the inertia routine, a
 
 Anyway, you've done that for values of $Q_{20}$ between 0 and 8, and you're waiting for those to complete (hopefully they'll take less than 3hrs!). Once they do, you can test out your post-run\_whatever.py Python script to see if it really \textit{does} group things nicely. You should have it generate the inertia input file, with multipole moments, Lagrange coefficients, and file names correctly and automatically (it's mostly there already; I think you just need to add the multipole constraints). And then you can test out your MPI version of the inertia code. You've tested it and it works when compiled and run serially (at least, it gives the same results as before, which you'll assume are correct until you hear back from Jhilam).
 
+\section*{21 March 2017}
+When you get around to setting up your inertia wrapper, I think the nicest and most user-friendly thing you could do would be to activate the Python setup script.
+
+\begin{enumerate}
+\item It should take as inputs the XML file and the directories containing record, qp, and maybe output files (and Lipkin files if you're into that kind of thing).
+\item[Note] Whatever naming scheme you use, it should be independent of the indexing scheme used originally.
+\item It'll create and populate directories for each $Q_{20}$ value, create path and path\_new files for each directory that HFODD can use to calculate the neighbors.
+\item Then it'll create the SLURM batch script (with multiple SRUN commands) that HFODD will use to compute the neighboring points.
+\item Once HFODD is done, those same MPI ranks will collect the outputs into their proper folders with their proper names. Python will create input files for the inertia code in each subdirectory. Then it will run the inertia code on a subdirectory level.
+\item After the inertia code completes on a subdirectory level, the results (and perhaps the output files if you're into that kind of thing) will be collected and compiled into the parent folder, and a master output file will be created.
+\end{enumerate}  
+
+\section*{28 March 2017}
+I haven't really explained what I've been up to for the past several days (or at least, I haven't committed my thoughts from my notebook to my computer). After discovering that much of the inertia wrapper I was trying to develop had already been done more cleanly by Nicolas, this week I've started developing a new Python class called Point, which corresponds to a single point in the PES. I'm going to give it some neat methods that will sort of streamline the creation of neighboring jobs and such. Right now, I've successfully been able to initialize an instance of Point from an instance of DataFile (just by picking one of them out randomly). The script which was able to do that is the following:
+
+\begin{verbatim}
+from pes import * 
+from collections import defaultdict,Counter
+oldpoint = Point('294Og_PES.xml', 176, 118, var=('q20','q30'))
+tree = oldpoint.ReadFile()
+glob_dico = oldpoint.GetGlobal(tree)
+dico = {}
+dummy = oldpoint.GetVariable(tree, val='id')
+dico['id'] = dummy['id']
+for constraint in oldpoint.var:
+	dummy = oldpoint.GetVariable(tree, val=constraint)
+	dico[constraint] = dummy[constraint]
+	
+dico_arr = {}
+for observable in ['EHFB', 'Z1', 'A1', 'zN', 'qN', 'D']:
+	dummy = oldpoint.GetVariable(tree, val=observable)
+	dico_arr[observable] = dummy[observable]
+	
+newpoint = oldpoint.CreateNewPoint(glob_dico, 0, oldpoint.var, dico, dico_arr, 0)
+\end{verbatim}
+
+One complication that arises, however, is that in order for this to work as currently written, the old point must be initialized from the entire XML file, and that XML file must currently be an element in the Point class (which technically is possible but it sort of violates the goal of the project). It would be nice to have a method which truly takes an actual DataFile and spits out a Point. What you might consider doing is generating a DataFile from a DataFile, and then taking the output DataFile and using it to initialize a Point afterwards. Anyway, something to think about.
+
+\section*{29 March 2017}
+
+Welp, it turns out I've been working on an outdated branch of the PES module. I got access to the latest one today and spent the afternoon familiarizing myself with what's new. It seems really nice and sleek, so I think it should be pretty easy to work with and adapt what I've been doing. Now I just need to spend some time figuring out what changes.
+
+And I had \textit{just} gotten my instance of \texttt{Point} to initialize from a \texttt{DataFile}...
+
 \end{document}          
