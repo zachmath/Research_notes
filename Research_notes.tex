@@ -159,4 +159,14 @@ Welp, it turns out I've been working on an outdated branch of the PES module. I 
 
 And I had \textit{just} gotten my instance of \texttt{Point} to initialize from a \texttt{DataFile}...
 
+\section*{31 March 2017}
+
+So the good news is I've created a successful Point class in the new \texttt{pes\_tools} module, and you can specify a set of constraints with their values and it'll spit out an XML tree for that particular point. You can also find neighbors surrounding that point as XML trees, the idea being that you can feed them into input files for use in an inertia calculation.
+
+The thing is it all feels so stupid. It's been done already! Why does it need to be done again? Indeed, this will look a little bit cleaner, hopefully. Then your actual inertia\_setup script can probably be actually pretty short. You'll still have to deal with file movement, but a lot of things will be moved behind the scenes into the various pes module methods.
+
+The toughest spot will be the part you've been avoiding the most: figuring out how to divide up a whole large reservation of processors to cover the entire PES efficiently and without overlap. You can fit 3 neighborhoods per node (assuming 4 neighbors per neighborhood and 3 OpenMP ranks per task = 12 tasks per neighborhood, with 36 possible tasks per node). Just FWIW, assuming something like 830 neighborhoods (which is roughly what you've got right now for $^{294}Og$), that's going to require $830/3 \approx 277$ nodes. Estimating walltime, I'd give yourself something like an hour and a half to two hours to do the HFODD run for the neighborhood, and another half hour to do the inertia calculation. Three hours \textit{should} be more than enough time to do it all. I say "should" because these SLURM emails sitting in my inbox report inertia calculation times closer to an hour and a half, for the HFODD portion, but they never actually completed the inertia calculation (I was trying to do them all at once, but it's probably best to just do it by neighborhood, rather than for a whole slice of neighborhoods).
+
+Whatever script you end up creating, you should make it modular and flexible enough that you can pin a path calculation onto the end of it without too much trouble. And it should work in any number of dimensions (which thankfully, so far it does. Your other script would have taken some real tweaking for that to happen, though). The one place where this might struggle is when probing along the pairing parameter. I imagine you could tweak that, too, without it being a huge problem, but that's going to take some thought. Most likely everywhere you have a loop over \texttt{collective\_variables}, you'll need to stick an \texttt{if q == lambda\_n or q == lambda\_p} statement in there.
+
 \end{document}          
