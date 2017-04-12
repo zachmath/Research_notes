@@ -13,13 +13,13 @@
 \subsection*{\date{1 March 2017}}
 Most recently I tried using Erik's modified version of HFBTHO to run for several constraints along $Q_{30}$ (or anywhere, really). What I'd like to do is use HFBTHO to generate densities quickly for $^{176}$Pt between $Q_{20}=241$ and $Q_{20}\approx 300$, and at $Q_{30}=4, 18$ (something I decided semi-arbitrarily once upon a time). I'm putting that on hold for a bit while I work on this inertia thing. Erik sent me some notes for perhaps getting the code to do what I want it to do, which are in my email. The files are currently in /p/lscratchh/matheson/locali-176Pt/hfbtho (/erik for testing his version of the code). Another thought I had was to try constraining $Q_{40}$ to something reasonable, and then releasing that constraint to find the actual density (hopefully) nearby.
 
-\section*{\date{1 March 2017}}
-\subsection*{Impact of basis deformation on EHFB}
+\section*{Impact of basis deformation on $E_{HFB}$}
+\subsection*{\date{1 March 2017}}
 We wanted to see how much the observables of the system would change if we used a single HO basis across an entire PES. This is based on a misunderstanding I had of something Jhilam said, where in order to use his inertia code, you need adjacent points to have the same basis deformation and other basis properties (so that you can numerically take derivatives of the densities at those points). It turns out he gets around this problem by changing the basis every 30b along Q20, but all the same we thought it would be good to check the dependence of system observables on the basis, especially since the half-life is so dependent on small deviations in the potential energy (a change of 1 MeV can affect the half-life by orders of magnitude).
 
-To test, I took three points on the PES I had generated for $^{294}$Og: (-14, 0), (72, 0), and (148, 28). According to the output file, the basis deformation chosen for each of these (by the automatic basis setting routine in HFODD) was, respectively, AL20 = 0.187, 0.424, and 0.608. I took those record files and used them to restart a new calculation, this time with the basis deformation set uniformly to AL20 = 0.61 (and AL40 = 0.10). The superdeformed asymettric shape was, understandably, least affected by the change, with the kinetic energy varying by about 3 MeV but the total energy varying by only about 0.14 MeV (-2085.878548 vs -2086.012955). Quasiparticle and canonical single-particle states were nearly identical, and fragment properties were almost the same (except for the interaction energies, which were quite different). The elongated symmetric shape differed by about 0.6 Mev (-2080.815396 vs -2080.202346). The oblate ground state didn't converge in the allotted time, but based on its last iteration it was probably going to finish with an HFB energy around -2078.649984 (compared to -2080.263986 from before), a difference of about 1.6 MeV.
+To test, I took three points on the PES I had generated for $^{294}$Og: (-14, 0), (72, 0), and (148, 28). According to the output file, the basis deformation chosen for each of these (by the automatic basis setting routine in HFODD) was, respectively, AL20 = 0.187, 0.424, and 0.608. I took those record files and used them to restart a new calculation, this time with the basis deformation set uniformly to AL20 = 0.61 (and AL40 = 0.10). The superdeformed asymmetric shape was, understandably, least affected by the change, with the kinetic energy varying by about 3 MeV but the total energy varying by only about 0.14 MeV (-2085.878548 vs -2086.012955). Quasiparticle and canonical single-particle states were nearly identical, and fragment properties were almost the same (except for the interaction energies, which were quite different). The elongated symmetric shape differed by about 0.6 Mev (-2080.815396 vs -2080.202346). The oblate ground state didn't converge in the allotted time, but based on its last iteration it was probably going to finish with an HFB energy around -2078.649984 (compared to -2080.263986 from before), a difference of about 1.6 MeV.
 
-\section*{3 March 2017}
+\subsection*{3 March 2017}
 I've written a Python script which extracts the basis parameters from a previous run of HFODD, and uses it to initialize a new run for several neighboring points in order to facilitate an inertia calculation down the line. A problem we noticed, though, was that, while setting the $\alpha_2$ deformation parameter worked fine, the basis was totally different because there was an additional constraint on $\alpha_4$. It turns out that what had happened is that the code automatically sets default values of $\alpha_2$ and $alpha_4$, UNLESS you set the code to choose the basis automatically, in which case it only sets a value for $\alpha_2$. You can get around that by deleting the preset line in HFODD and recompiling, but I'd like for there to be an easier way. Perhaps the basis matrix is initialized to zero? So we could get around it by just setting $\alpha_4=0$ in the input file? $\Rightarrow$ Aha, yes. That'll work. So we're benchmarking the time on that now.
 
 Another thing we're testing is comparing versions of the inertia code. Jhilam sent Nicolas an input and an output for $^{240}$Pu. I'm running a single point now. Later, I'll run the surrounding points using both my convention and Jhilam's for how widely-spaced the points should be. I'll also compare the inertia computer with the code Jhilam sent me versus the one in Nicolas' repository.
@@ -32,7 +32,7 @@ Of course, to do that we'll need working inertia codes. Right now, I don't under
 
 $\mathtt{Intel MKL ERROR: Parameter 8 was incorrect on entry to ZGEMM}$
 
-\section*{6 March 2017}
+\subsection*{6 March 2017}
 Today I worked on two computational problems: the large number of iterations, even for a small perturbation from the record file's original point; and benchmarking a working inertia calculation against Jhilam's results.
 
 For problem \#1, I noticed that even after setting the basis parameters manually in the input file, I was still seeing that a different basis was used during the run and [consequently?] these were still taking ~70-80 iterations to converge. I showed Nicolas and he had me flip a Lagrange multiplier continuation switch in the input file, but I've re-run the code since then and the problem still exists, that the new run uses a slightly different basis than the original. and it still takes ~70-80 iterations to converge.
@@ -50,7 +50,7 @@ whereas Jhilam is getting:
    0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
 \end{equation}
 
-\section*{7 March 2017}
+\subsection*{7 March 2017}
 Today, after modifying the input file and doing some debugging, I'm getting:
 \begin{equation}
     0.011378\    0.034354\    0.000000\   -0.001988\    0.000000\    0.000000
@@ -63,7 +63,7 @@ I'm still not sure what's going on with the other thing, with the basis getting 
 
 When you come in tomorrow, the things to work on should be: 1) spend the morning working on deriving the ATDHFB inertia, then 2) in the afternoon, talk to Nicolas about the inertia code you got working (maybe Jhilam will have sent you a basis to use), and perhaps see if Nicolas has any additional insight on the basis problem you're seeing here.
 
-\section*{8 March 2017}
+\subsection*{8 March 2017}
 Good news: Nicolas figured out what was happening with the basis. Apparently there were rounding truncation errors that popped up when the parameters FCHOM0 and AL20 were written to file, and the line FREQBASIS isn't even read at all. Going back into the source and figuring out how FCHOM0 and AL20 were computed for the centerpoint, and plugging these values into the input file with lots of decimal points seems to have solved the problem. It still takes several iterations to converge, but it will hopefully be faster than before (it's still running so we'll see).
 
 The formulae you'll ultimately need to implement in your Python script for preserving the basis are the following:
@@ -75,7 +75,7 @@ The formulae you'll ultimately need to implement in your Python script for prese
 \end{eqnarray}
 \noindent where $q_{20}$ refers to the quadrupole deformation of the centerpoint.
 
-\section*{9 March 2017}
+\subsection*{9 March 2017}
 Aha! Figured out what was causing the ZGEMM error in the inertia file. I was using a max basis size of 1200 when I compiled the inertia code (as defined in hfodd\_sizes\_....f90), but the particular matrices I was trying to multiply were created using a basis size of like 1600. So that's resolved. One thing, though, is that, while it gives the same results as the 3D case, they are in a different order. So that's something you should clean up in the code. 
 
 Additionally, I've redone the calculations for the inertia benchmark, this time using the correct basis for the points surrounding the center point, and fixing whatever Lipkin-Nogami problem I was having, and this is what I get:
@@ -96,7 +96,7 @@ Just judging from the outputs, it looks like everything converged properly and t
 
 \noindent But if that doesn't work (which it didn't), then perhaps it's a problem related to the parameter I switched? Is there a modification to the formula when you change $\lambda$ instead of a multipole moment? Did I change the wrong $\lambda$? Was I only supposed to change $\lambda$ for protons $\mathit{or}$ neutrons but not both?
 
-\section*{10 March 2017}
+\subsection*{10 March 2017}
 Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$, he would have used the basis corresponding to $Q_{20}=60$ (as far as FCHOM0 and $\alpha_{20}$ are defined). In general, his method is to round down to the nearest multiple of 30. With this I get:
 
 \begin{equation}
@@ -105,17 +105,18 @@ Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$
 
 \noindent with $E_{HFB}=-1801.173695 MeV$
 
-\section*{13 March 2017}
+\subsection*{13 March 2017}
 It seems there's no problem with the $\lambda$ terms in the inertia output (at least, not one unique to just the pairing terms).  The issue there is that Jhilam normalized his coordinates in the end, such that $\delta x=1$ for every collective coordinate instead of the $d\lambda=0.01$ I'm using. Since this only affects the denominator in my derivatives $\frac{\delta \rho}{\delta q}$, this means shifting the decimal point over by 2 slots (or 4 in the $\lambda-\lambda$ case) for the pairing terms.
 
 So it $\mathit{looks}$ like the inertia code is working. Everything is correct to within ~20\% compared to Jhilam's result. But it would be good to make absolutely sure, which means examining Jhilam's output files, if possible. 
 
-\section*{17 March 2017}
+\section*{Inertia Wrapper}
+\subsection*{17 March 2017}
 The past couple days you've been working on parallelizing the inertia routine, and figuring out how to quickly setup runs for the "satellite" points on your PES. You've got some scripts that will help, although between writing them a couple days ago and using them now, it seems you've already sort of forgotten what they need to work - or rather, you see that they aren't quite as universal as you were hoping. You need an XML file, which needs output files. If you have a big XML file and need to split it up, you did that by hand today but I'm guessing there's an easier way. But it looks like you WILL need to do some splitting up. Not the way you had originally anticipated, where you submitted a job for every single point on the PES to have its satellites computed. But since the speedup for using nearby points only seems to occur when you use the same basis as the centerpoint, this means that you have to group centerpoints by $Q_{20}$. That'll reduce the number of jobs on Quartz by ~15, but it's still a nuisance.
 
 Anyway, you've done that for values of $Q_{20}$ between 0 and 8, and you're waiting for those to complete (hopefully they'll take less than 3hrs!). Once they do, you can test out your post-run\_whatever.py Python script to see if it really \textit{does} group things nicely. You should have it generate the inertia input file, with multipole moments, Lagrange coefficients, and file names correctly and automatically (it's mostly there already; I think you just need to add the multipole constraints). And then you can test out your MPI version of the inertia code. You've tested it and it works when compiled and run serially (at least, it gives the same results as before, which you'll assume are correct until you hear back from Jhilam).
 
-\section*{21 March 2017}
+\subsection*{21 March 2017}
 When you get around to setting up your inertia wrapper, I think the nicest and most user-friendly thing you could do would be to activate the Python setup script.
 
 \begin{enumerate}
@@ -127,7 +128,7 @@ When you get around to setting up your inertia wrapper, I think the nicest and m
 \item After the inertia code completes on a subdirectory level, the results (and perhaps the output files if you're into that kind of thing) will be collected and compiled into the parent folder, and a master output file will be created.
 \end{enumerate}  
 
-\section*{28 March 2017}
+\subsection*{28 March 2017}
 I haven't really explained what I've been up to for the past several days (or at least, I haven't committed my thoughts from my notebook to my computer). After discovering that much of the inertia wrapper I was trying to develop had already been done more cleanly by Nicolas, this week I've started developing a new Python class called Point, which corresponds to a single point in the PES. I'm going to give it some neat methods that will sort of streamline the creation of neighboring jobs and such. Right now, I've successfully been able to initialize an instance of Point from an instance of DataFile (just by picking one of them out randomly). The script which was able to do that is the following:
 
 \begin{verbatim}
@@ -153,13 +154,13 @@ newpoint = oldpoint.CreateNewPoint(glob_dico, 0, oldpoint.var, dico, dico_arr, 0
 
 One complication that arises, however, is that in order for this to work as currently written, the old point must be initialized from the entire XML file, and that XML file must currently be an element in the Point class (which technically is possible but it sort of violates the goal of the project). It would be nice to have a method which truly takes an actual DataFile and spits out a Point. What you might consider doing is generating a DataFile from a DataFile, and then taking the output DataFile and using it to initialize a Point afterwards. Anyway, something to think about.
 
-\section*{29 March 2017}
+\subsection*{29 March 2017}
 
 Welp, it turns out I've been working on an outdated branch of the PES module. I got access to the latest one today and spent the afternoon familiarizing myself with what's new. It seems really nice and sleek, so I think it should be pretty easy to work with and adapt what I've been doing. Now I just need to spend some time figuring out what changes.
 
 And I had \textit{just} gotten my instance of \texttt{Point} to initialize from a \texttt{DataFile}...
 
-\section*{31 March 2017}
+\subsection*{31 March 2017}
 
 So the good news is I've created a successful Point class in the new \texttt{pes\_tools} module, and you can specify a set of constraints with their values and it'll spit out an XML tree for that particular point. You can also find neighbors surrounding that point as XML trees, the idea being that you can feed them into input files for use in an inertia calculation.
 
@@ -169,7 +170,7 @@ The toughest spot will be the part you've been avoiding the most: figuring out h
 
 Whatever script you end up creating, you should make it modular and flexible enough that you can pin a path calculation onto the end of it without too much trouble. And it should work in any number of dimensions (which thankfully, so far it does. Your other script would have taken some real tweaking for that to happen, though). The one place where this might struggle is when probing along the pairing parameter. I imagine you could tweak that, too, without it being a huge problem, but that's going to take some thought. Most likely everywhere you have a loop over \texttt{collective\_variables}, you'll need to stick an \texttt{if q == lambda\_n or q == lambda\_p} statement in there.
 
-\section*{7 April 2017}
+\subsection*{7 April 2017}
 Holy crap, it's been another week! Welp, in any case, I think I'm going to give up trying to get MPI Spawn from within a Python script to launch HFODD runs. I've had some level of success. To pull this off, you needed to be able to launch several concurrent MPI tasks simultaneously, each with several OpenMP threads:
 
 \begin{verbatim*}
@@ -182,9 +183,11 @@ That's all okay. We got that. Then you needed to spawn onto these processors. Yo
 
 Just to reiterate and make it clear, though: \textbf{Spawning a multithreaded executable}... actually might work, IF you had a specially-made executable just for that purpose. The question is whether it's worth modifying HFODD. So my question is, for a spawned process, do calls to \texttt{MPI\_COMM\_WORLD} refer to the communicator created by the spawn (i.e. \texttt{MPI\_GET\_PARENT}) or everything from before? I'm inclined to believe that it should just be the stuff you care about. So you could probably get it to work by just adding a few lines \texttt{MPI\_Comm\_get\_parent( parentcomm )} right after MPI\_INIT and \texttt{MPI\_Comm\_free( parentcomm )} right before MPI\_finalize (tucked inside some preprocessor option, of course). That might work... Okay, that's my goal for the end of the day. Compile a version of HFODD that is meant to be a worker in an MPI\_spawn, and see if you can get it to run.
 
+\noindent\textbf{UPDATE}
+
 ...Okay, I am officially declaring \textbf{MPI Spawn NOT the solution} that I'm looking for. When I set up a test run, there was some error. I didn't have time to diagnose it yet when I talked to Kyle and he pointed out that mixing MPI implementations will lead to all kinds of crashes. That means that since my Fortran executable was built using the default system MVAPICH while my Python launch script was running from a side installation of mpi4py built over OpenMPI, they were going to have issues talking to each other (which is probably what I saw). So no, that's not gonna happen.
 
-\section*{10 April 2017}
+\subsection*{10 April 2017}
 I decided I'm going to try doing things the easy way: just making one large resource allocation request, and in the script submitting several srun commands in the background and letting the scheduler figure out how to spread them out. I think that'll be the easiest and most portable in the long run. Right now the issue I'm having is that I'd like to define and launch those srun commands within a Python script; however, the resource allocation closes when the tasks in the script complete, and any jobs launched in the background by Python are disconnected from the batch script which launched Python, with the result that the scheduler \textit{thinks} that the job has finished even though there are tasks running in the background. I could get around that by having one thread just sleep for a really long time, but that would waste a thread and also it'd waste a lot of walltime if there really was a problem in the executable somewhere that caused it to close early.
 
 I ended up getting by it for the time being by just probing \texttt{ps} every 60 seconds, and if there is still an srun process running, the process sleeps for 60 seconds and tries again. I guess this isn't much better than having the one thread sleep for a long time since it still ties up a thread somewhere (which may or may not lead to a performance hit somewhere else? It's not resource intensive so it shouldn't be a big deal to multithread this on a processor with some other task...), but it does get you to within a minute of the actual execution time, so worst case scenario you waste about 59 seconds of walltime.
@@ -197,6 +200,36 @@ And the nice thing is that this is fairly portable. FOr a system that uses mpiru
 shell$ mpirun -np 2 a.out : -np 2 b.out
 \end{verbatim}
 
-And in fact, you might even be able to do something fancier with srun by creating a MPMD config file: https://computing.llnl.gov/tutorials/linux_clusters/multi-prog.html
+And in fact, you might even be able to do something fancier with srun by creating a MPMD config file:
+
+\noindent\verb|https://computing.llnl.gov/tutorials/linux_clusters/multi-prog.html|
+
+\section*{$^{294}$Og}
+\subsection*{10 April 2017}
+Moving on back to working with $^{294}$Og, it would be nice to do calculations with multiple EDFs as a sort of gauge on uncertainties. For Gogny and UNEDF functionals, pairing is included automatically because it was explicitly included in the parameter fit. This is not the case in general, however. So if we want to use SkM*, for instance, we should figure out ahead of time what the pairing interaction will look like. Nicolas and Witek suggested a couple of ways of doing this. Nicolas suggests using experimental mass evaluations to compute binding energies and then the pairing gap, and I assume we can use a formula like this BCS formula to compute the pairing strength from there:
+\begin{equation}
+\Delta_{BCS} = (E_{max}-E_{min})e^{-\frac{1}{V_0\rho}}
+\end{equation}
+
+\noindent where $(E_{max}-E_{min})$ is the spread of single-particle energies for orbitals participating in the pairing (probably taken to be about 60-100 MeV), $\rho = \frac{dn_s}{dE} \approx \frac{A}{100} MeV^{-1}$ is the energy density of states, and $V_0$ is the pairing strength. This should be done for both protons and neutrons. Here is the pairing gap for neutrons (there is not enough data for protons):
+
+\begin{verbatim}
+********************************************************************************
+*                                                                              *
+*  EXTRACTED EXPERIMENTAL PAIRING GAPS, BCS-EQUIVALENT GAPS  AND S.P. LEVELS   *
+*                                                                              *
+********************************************************************************
+*                                                                              *
+*  Z =118 **********************************************************************
+*                                                                              *
+* NEUT DELTA3  DEMINU  DEMIDD  DEPLUS  ESINGP  SEPAR1  SEPAR2  BIND.-EN  ERROR *
+*                                                                              *
+*?176  0.4410  0.0090  0.4455  0.8820  0.0000  -7.665   0.000 -2078.045 0.5880 *
+********************************************************************************
+\end{verbatim}
+
+\noindent When all is said and done, you should get something in the ballpark of -250 MeV or so, plus or minus probably like 50 MeV. I think one of those approximations must be wrong somewhere because the numbers I'm getting are nowhere close. Anyway, I'll put that on hold for a moment because we don't have the proton data anyway.
+
+Witek suggests a better way would be to use the inertia-like quantity in equation 4 of \verb|https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.116.152502|. Again, we'd run into the problem of not having enough datapoints nearby, plus I'm also not sure how we'd use this to extract a pairing strength. The paper gives an expression of pairing energy in equation 2, but I don't know how to calculate that without already knowing the answer.
 
 \end{document}          
