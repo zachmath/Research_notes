@@ -230,6 +230,13 @@ Moving on back to working with $^{294}$Og, it would be nice to do calculations w
 
 \noindent When all is said and done, you should get something in the ballpark of -250 MeV or so, plus or minus probably like 50 MeV. I think one of those approximations must be wrong somewhere because the numbers I'm getting are nowhere close. Anyway, I'll put that on hold for a moment because we don't have the proton data anyway.
 
-Witek suggests a better way would be to use the inertia-like quantity in equation 4 of \verb|https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.116.152502|. Again, we'd run into the problem of not having enough datapoints nearby, plus I'm also not sure how we'd use this to extract a pairing strength. The paper gives an expression of pairing energy in equation 2, but I don't know how to calculate that without already knowing the answer.
+Witek suggests a better way would be to use the inertia-like quantity in equation 4 of \verb|https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.116.152502|. Again, we'd run into the problem of not having enough datapoints nearby, plus I'm also not sure how we'd use this to extract a pairing strength. The paper gives an expression of pairing energy in equation 2, and another way of computing it in this presentation from Nobuo:
+
+\noindent\verb|https://public.ornl.gov/conferences/ns2016/3_Wednesday/Session_1/NS2016_W1_3_Nobuo_Hinohara.pdf|.
+
+\noindent but still no way to relate to the pairing strength, unless you make assumptions about the pairing interaction (like making it only a surface pairing interaction).
+
+\subsection*{18 April 2017}
+After talking to Nicolas about it the other day, I guess the best way to find the pairing strength given the pairing gap is actually to just try several different pairing strengths in your input file, and then run them until you get the pairing gap you were hoping for (same goes for whatever quantity it was Witek wanted us to compute). This might involve several HFODD runs for several different nuclei, but it's algorithmic enough that you could make that happen automatically by automating it somehow. Anyway, we'll just leave that up to Jhilam since he's doing the SkM* stuff and I'll take care of UNEDF1-HFB.
 
 \end{document}          
