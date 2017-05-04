@@ -239,4 +239,16 @@ Witek suggests a better way would be to use the inertia-like quantity in equatio
 \subsection*{18 April 2017}
 After talking to Nicolas about it the other day, I guess the best way to find the pairing strength given the pairing gap is actually to just try several different pairing strengths in your input file, and then run them until you get the pairing gap you were hoping for (same goes for whatever quantity it was Witek wanted us to compute). This might involve several HFODD runs for several different nuclei, but it's algorithmic enough that you could make that happen automatically by automating it somehow. Anyway, we'll just leave that up to Jhilam since he's doing the SkM* stuff and I'll take care of UNEDF1-HFB.
 
+\subsection*{3 May 2017}
+Here are some observations about the ongoing PES's that I have up to this point:
+\begin{enumerate}
+\item Symmetric fission has an initial barrier blocking it, but if the nucleus tunnels through (or even wraps around) the barrier, it seems to go to lower energies faster. However, it still seems to scission asymetrically at lower elongations than symmetrically.
+\item I'll have to look at the actual outputs or something, but it seems like perhaps triaxiality is reinstated at the first sign of scission around $Q_{20}\approx200$. At this point, it seems likely that whatever scission takes place would probably have a large mass-asymmetry (that's not clear to me from the Q20-Q22-Q30 plot, however).
+\item When I started my Q20-Q22 run, I used restart files corresponding (I think) to Q30=4. The result is that in the region between roughly Q20=75 and Q20=125, there is a strong tendency for the system to move to greater mass asymmetry (it'll follow the asymmetric fission valley in your Q20-Q30 plane). After the ridge dividing symmetric and asymmetric paths instersects with the line Q30=4 (which happens at around Q20=125), it will tend back towards symmetric configurations.
+\begin{enumerate}
+\item The first thing I'd like to do is investigate mass asymmetry for larger quadrupole deformations. I notice there continues to be some octupole activity beyond Q20=125 and I don't know if that is an artifact of which points I used to restart HFODD or if that's just what the surface looks like. Just from checking the output file of Q20=152, Q22=12, it \textit{looks} like it started from the Q20=152, Q30=4 file - and NOT Q20=120, Q22=12 - but I'd like to just be sure, I guess.
+\item I'm torn on whether or not to fix the octupole moment to zero, or just to initialize from rec files with Q30=0 and let it evolve from there (it probably won't change at all, in practice, but that's not my decision!). I think I WON'T fix it...
+\end{enumerate} 
+\end{enumerate}
+
 \end{document}          
