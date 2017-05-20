@@ -245,6 +245,24 @@ Worth noting, by the way, is that even though I don't have these results saved a
 
 For $T=1$ and cutoff$=10^{-13}$, the inertia I got was \verb|-2.075285E-0001|, which as far as I can tell is not unreasonable (except why is the sign negative?!).
 
+\subsection*{19 May 2017}
+
+Okay, here's sort of a summary table. $\delta q$ refers to the separation between points used to calculate the derivatives $\frac{\delta \mathcal{R}}{\delta q}$. The numerator cutoff refers to whether or not I truncated the numerator (the densities) to the same level that I truncated the $f_a-f_b$. On the one hand, you could claim they should be truncated because there's a lot of complicated expressions leading into them and you can't really trust the results beyond a certain point; on the other hand, these numbers aren't the ones that seem to be causing the problem - it's the $f_a$'s!
+
+\begin{tabular}{|c|c|c|c|c|}\hline
+Temp & cutoff & Numerator cutoff? & \delta q & $\mathcal{M}_{20,20}$ \\ \hline\hline
+0      &  none       & no   &  4   &  1.618428E-0002  \\\hline
+0.005  &  $10^{-13}$   & yes  &  4   & -3.891427E+0002  \\\hline
+0.005  &  $10^{-13}$   & yes  & 0.01 & -1.417471E+0001  \\\hline
+0.005  &  $10^{-14}$   & no   &  4   & -8.471734E+0003  \\\hline
+0.005  &  $10^{-15}$   & no   &  4   & -1.452580E+0005  \\\hline
+0.005  &  $10^{-15}$   & yes  &  4   & -1.452580E+0005  \\\hline
+1      &  $10^{-13}$   & no   &  4   & -2.075285E-0001  \\\hline
+1      &  $10^{-15}$   & no   &  4   & -2.003790E+0001  \\\hline
+\end{tabular}
+
+Sooo, another thing: it's probably significant that the $T=0$ inertia is positive, while all the rest of them are negative. Like, something's definitely up with that.
+
 \section*{$^{294}$Og}
 \subsection*{10 April 2017}
 Moving on back to working with $^{294}$Og, it would be nice to do calculations with multiple EDFs as a sort of gauge on uncertainties. For Gogny and UNEDF functionals, pairing is included automatically because it was explicitly included in the parameter fit. This is not the case in general, however. So if we want to use SkM*, for instance, we should figure out ahead of time what the pairing interaction will look like. Nicolas and Witek suggested a couple of ways of doing this. Nicolas suggests using experimental mass evaluations to compute binding energies and then the pairing gap, and I assume we can use a formula like this BCS formula to compute the pairing strength from there:
