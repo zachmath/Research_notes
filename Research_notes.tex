@@ -1,5 +1,6 @@
 \documentclass[]{report}
 \usepackage[utf8x]{inputenc}
+\usepackage{hyperref}
 
 
 % Title Page
@@ -287,6 +288,26 @@ I'm not 100\% I should trust the entries in the table for $\delta q=0.00001$ bec
 \subsection*{12 June 2017}
 As we continue to explore the orders-of-magnitude discrepancy in the temperature-dependent inertia tensor (which, according the the current code, jumps by something like $\sim 5$ orders of magnitude when you go from $T=0$ to $T=0.05$), Nicolas suggested first checking the convergence of the inertia as a function of $\delta q$. Then once we have a handle on that, we can start breaking other pieces down one-by-one. Right now it looks like going from $\delta q=10^{-1}$ to $\delta q=10^{-5}$, the magnitude of the inertia drops from about 1.646e-2 to 1.493e-5, which is roughly a 10\% drop. If we hold everything else constant, a 10\% error in the inertia leads to $\sim\sqrt{1.1}\approx1.0488$ or nearly a 5\% error in the action. That may not sound like much, but then you take the exponential to get the half-life. All in all, I carried it through just back-of-the-envelope style using a value for the action of 19.1 taken from Jhilam's paper as a ``typical'' value of the action, and a 5\% error in the action leads to an uncertainty factor of about 50 in the half-life. In other words, there's a range of not quite two orders of magnitude that are within your ``acceptable'' range for this level of precision in the inertia. I'm sure there's a good way to make this more rigorous, but there you go.
 
+\begin{tabular}{ccc}
+$S/S_{act}$ & $\tau_\frac{1}{2}$ & $\tau_\frac{1}{2}/\tau_{\frac{1}{2},act}$
+\\ \hline
+0.6 &	0.000000000025992915 &	0.0000002311960003 \\
+0.7 &	0.00000000118538631 &	0.00001054351056 \\
+0.8 &	0.0000000540586042 &	0.0004808284521 \\
+0.9 &	0.000002465299848 &	0.02192780089 \\
+0.95 &	0.00001664838879 &	0.1480803866 \\
+0.99 &	0.00007673158648 &	0.6824950532 \\
+1 &	0.0001124280478 &	1 \\
+1.01 &	0.0001647309344 &	1.465212085 \\
+1.05 &	0.0007592365904 &	6.753088799 \\
+1.1 &	0.005127192114 &	45.60420832 \\
+1.2 &	0.2338215373 &	2079.743817 \\
+1.3 &	10.6632461 &	94845.07026 \\
+1.4 &	486.2888963 &	4325334.343 \\
+
+
+\end{tabular}
+
 \subsection*{14 June 2017}
 I have a plot where I show the convergence of $\mathcal{M}$ as a function of $\delta q$ saved somewhere in my dudeman4 Google Drive, which I should probably pull out at some point. But another important thing to notice is that the solution diverged noticeably at $\delta q = 10^{-6}$. That may be because the HFODD density calculation terminated at the level $10^{-7}$. I'm going to test for that by pushing to a greater HFODD convergence level $10^{-8}$ and a tighter $\delta q = 10^{-7}$.
 
@@ -302,6 +323,65 @@ My preliminary analysis suggests that this won't be an issue. I compared proton 
 \end{verbatim}
 
 I'm redoing the entire calculation with a tighter convergence parameter and I just told it to print the second-to-last iteration, so we'll have all that information to look at in more detail soon enough.
+
+Something that might help reduce the error due to finite differences might be to do something totally different to compute the derivatives of the densities. One way to do this might be to use automatic differentiation. With automatic differentiation, the derivatives are computed at the same time as the quantities themselves (using the chain rule of the fundamental operations), and so at the end you get a derivative that is accurate to machine precision - \textit{waaaay} better than whatever you'd probably get from using finite differences. The downside to that is it would take a LOT of work to implement in HFODD (even with libraries that have been written).
+
+\subsection*{14 June 2017}
+I think I've had enough time to digest this, and now I'm ready to start speculating. It looks like the densities we compute in HFODD are probably accurate to within about 10\% of the convergence parameter (I should do some additional testing to confirm this, but it seems plausible). That makes sense, because that's roughly the level of fluctuations we see in \verb|E\_STAB| in the five iterations it takes for HFODD to declare the thing ``converged''. So this means that we can't probably trust our densities to any precision greater than, roughly speaking, the convergence parameter.
+
+So what does this mean for us? Specifically, what does this mean for our differentiation by finite differences with various sizes $\delta q$, and how does this change when we start dividing by our $f$s? I feel like there's a limit to the ``smallness'' of things we can actually divide by before it starts to turn into garbage, but what is it, exactly?
+
+I think it depends on the level of precision you need in your answer, of course, but let's look at some example cases. If you divide by something of the same order-of-magnitude as your noise, you would hope for a small number but instead you get something of order 1. That's not good! And worse, if you divide by something smaller than your noise, you're probably still hoping for a small answer (after all, $\delta \rho$ \textit{should} be small), but instead you get something \textit{significantly larger} than one. That's really not good!
+
+Now let's say you divide by a number roughly 100 times bigger than your noise (which, luckily, if it truly corresponds to our convergence parameter as I've supposed, is something we can estimate with a reasonable degree of certainty). Then you can expect to get something of order 0.01. That is, you can trust your answer to within about 1\%. If you're okay with that, then go for it. You know about what you need to do to get it.
+
+That's all fine, and it gives a handy prescription for knowing what level $\delta q$ to go for, given your convergence parameter. It also tells you what kind of precision you can expect in your final answer for the inertia. But now what do we do about finite temperature? Because that involves dividing by \textit{another} small number? I suspect the same things basically apply: your total denominator (the product of your two pieces) can only be so big compared to your numerator, and the precision of your final answer is essentially determined by the precision of your densities. But now my question is: by limiting the range of possible $f$s we can use, do we lose any essential physics?
+
+... I think my answer is that the physics just gets blurred out. All the $f$s you don't use just blend in to become numerical noise with all the rest.
+
+\subsection*{4 August 2017}
+I'm looking today into using Automatic Differentiation to replace the finite differences derivatives we currently compute to calculate the inertia. As I've shown previously, the finite differences approximation is (obviously) not perfect; furthermore, it's hard to have that done automatically. I have my Python script but I'm not convinced it's really that portable or efficient. It would be really neat to be able to compute the inertia correctly at runtime with the rest of the program and have it feature in the output file.
+
+As I see it, here are the challenges associated with such a thing:
+\begin{itemize}
+\item We'd need to compute derivatives with respect to multiple constraints, which are called in a loop. I don't know exactly how the AD software would compute derivatives, whether it finds a general form you can plug numbers into at the end or (more likely) propogates numbers throughout. Likewise, I don't know how it handles multiple parameters/variables. I'm sure that's not the biggest issue, but it's a potential issue.
+\subitem Although it might turn out that this is trivial. I'm not positive, but if the constraints only appear as a number that gets multiplied by an identity-like matrix and then added to the energy, and finally multiplied by the density, then it's pretty easy to predict its impact on the final result. It's just a linear relationship
+\item Then there's computing derivatives with respect to the $\lambda_2$ used in controlling the dynamical airing part. That's just one more piece that you wouldn't always need to do, but it would make setup just a bit more complicated.
+\subitem And it's conceivable that this is just as easy as the multipole constraint multipliers If that's the case, then I don't think we'd even need the mess of a full AD machinery. It seems you'd just do three matrix inversions in your last step instead of one (for a single derivative) and call it good. Wait, no, I'm still thinking finite difference-based numerical differentiation. This seems like something we could compute \textit{exactly}. Lemme think about it a bit more...
+\subitem Is this correct? And if so, is that inverse and subsequent multiplication something that would be computationally feasible? One objection I have is that all multipole moments would have the same derivative. There must be something I'm missing...
+\end{itemize}
+
+\begin{eqnarray}
+\mathcal{HR}_n+q\mathcal{IR}_n&=\mathcal{R}_{n+1}E \nonumber\\
+\frac{d\mathcal{R}_{n+1}}{dq} &= \mathcal{IR}_nE^{-1}
+\end{eqnarray}
+
+\begin{itemize}
+\item Whatever AD software we find needs to be able to handle several versions of Fortran
+\item It needs to be able to handle matrices
+\item Technically, we don't even compute the density in the program; that's not done until later. What gets put out in the QP file is only about half of what you need. Unless the full density is computed in the program and I just don't know about it, which is possible
+\item It would be best to only calculate the derivative at the last iteration, because I'm guessing it'll add a fairly high computational cost if we find the derivative after every iteration. That's a lot of iterations
+\end{itemize}
+
+\subsection*{4 August 2017}
+Another challenge associated with this derivative is that HFODD uses (I think by default) the Augmented Lagrangian Method for multipole constraints. This means that there is both a linear and a quadratic penalty term associated with each constraint. Or in other words, there is no easy way to exploit the form of the EDF to calculate the derivatives of the densities.
+
+I think I'm going to put the Automatic Differentiation thing on hold for now, unless I can find someone willing and able to walk me through it. It just seems like a lot of work and a whole lot of concepts I'm not familiar with for something that we can do almost as well and with less hassle.
+
+Maybe tomorrow I'll look into what it would take to add a finite-differences inertia subroutine/function during the last iteration of HFODD. You'd have to create a new row in the namelist and name a new set of QP files and output files. Those'll be the tricky part (though luckily you can probably copy and paste a lot of code from other places). The rest of it - starting a new set of HFB iterations within the HFB iterations - probably won't be that hard. You'll just have to create a new flag in the code to keep track of which neighbor point you're looking at.
+
+\subsection*{22 August 2017}
+For the time being I've decided against adding the inertia into the body of HFODD still. I'm torn on the pros and cons but the major pro is that it's probably less work to modify the stuff I already have. However, there are still challenges to be resolved. One is the following: in theory it should be possible to reserve an allotment of resources on Quartz and then break it into chunks and have each chunk do something different. This is the basis for the Python script I wrote. However, it hasn't worked the way I wanted, and after talking with the LC staff it turns out that at least one problem is that there is a minimum one node requirement for the size of your chunks; that is, you can't have multiple sruns per node. This throws a wrench in my plans, but I think we can get more or less around it by using the MANYCORES version of HFODD. We'll stretch out the jobs over a larger number of cores than originally planned, but hopefully it should finish faster by approximately the same factor. If the LC people get back to me and we can verify that this works, then I'm okay with it. It's still not pretty but it's better than nothing. And actually, if we do it this way and request fewer nodes than points in the PES (which we almost certainly will) then we should significantly improve the load balancing. Short of finding a way to compute the derivatives/inertia directly in HFODD, I think this is as good as we're gonna get.*
+
+*I thought about just doing every single neighboring point in one large HFODD run and then splitting that all up later, but apart from being a lot to rewrite and having poor load-balancing, there's the issue of each point having a different quadrupole deformation (hence basis). So it couldn't really work except in strips of just one $Q_{20}$ value.
+
+The next issue is that of computing the derivatives with respect to the pairing parameter. That's going to require an additional HFODD run in each direction ($\pm\delta\lambda$). First of all you'll need an HFODD executable that respects the \texttt{LAMBDA2} values that you try to give it. Given that, you can split the PES into individual points like you do in the case of the multipole constraints, but it might just be easier to do the entire layer as a complete HFODD run. It might be worth checking to see how much time it takes, and 
+
+\subsection*{28 August 2017}
+I'm really starting to think that the best long-term solution will be to just add the non-perturbative cranking as a subroutine in HFODD. You can specify the directions of the derivatives kind of like you do with when you choose the constraints, and you can even throw pairing in there as a constraint direction. You'll have to come up with a naming scheme for the outputs for those supplemental files (and you'll have to decide how many of them you want to keep, if any). And it might actually be really tricky to do an HFODD run from \textit{inside} HFODD. That's probably going to be the hardest part, actually. AND you're going to have to override the automatic basis somehow with one of your own choosing (to make sure you use the same basis as the original point). I think some of those things can be managed by just throwing a flag in there that turns on when you're doing a neighbor point instead of a centerpoint.
+
+For the short-term, though, maybe it would be best, given the number of constraints we have - not to mention the time constraint - to more or less follow the Python thang. You've got 3 constraints $\rightarrow$ 6 neighbors (not counting pairing, which we can do in bulk). To maximize use of the nodes, that means using 6 processors per task (perhaps 3 MPI ranks per task since there are 3 constraints, with 2 OpenMP threads?). That means you're going to need as many nodes reserved as you have points in your PES - which is a LOT of nodes. Quartz has 2688 nodes; you have something like 2000 points \textit{per value of} $\lambda$! That means reserving all of Quartz for 2 hours times the number of pairing layers! It might be a bit faster since we're using the MANYCORES option, but still. I think you'd really need to break this down somehow, but I'm not sure of a good way to do it. Since pairing will have to be computed separately, you'll have to do the inertia separately, too.
+
 
 \section*{$^{294}$Og}
 \subsection*{10 April 2017}
@@ -365,5 +445,41 @@ I was just re-reading Nicolas' first fission review article (PRC 90.054305.2014)
 \subsection*{9 June 2017}
 
 I still won't get to this for a while yet, but I wonder about the formula for the half-life. I know that's one of the most sensitive fission observables. Particular I wonder about the number of assaults on the fission barrier. That's typically taken to correspond to the vibrational energy 1MeV, which is probably a decent estimate but still something that could change depending on your nucleus and configuration. So I would suggest - at the very least - playing around with this number, just to check the robustness of your results before sending them in.
+
+\subsection*{7 August 2017}
+
+Just to update: I'm making progress on the 4D calculations. I had to cheat a little bit to get the constrained dynamical pairing correlations to work, but that seems to be resolved now so that's good. Restarting from $\lambda=0.0$, I got about 1070 points to converge for $\lambda=0.2$ with only about a seven or eight that aborted, and 948 for $\lambda=0.4$ ... The $\lambda=0.2$ calculations should finish pretty quickly based on where their convergence left off; the $\lambda=0.4$ might take a bit longer. I'm going to try the $\lambda=0.15$ set now just to see how quickly those converge, taking the $\lambda=0.2$ record files from which to restart. I'm also going to try starting $\lambda=0.5$ and $\lambda=0.6$ from the $\lambda=0.4$ record files because I think that'll help a bit (though not as much as the $\lambda=0.15$). I'm not sure exactly how high to go in $\lambda$... I think Jhilam said something about that once upon a time? Yes: you just have to check whether the min-action path touches the boundary (in $\lambda$) or not. I'll stop it at $\lambda=0.5$ and check (they didn't need more than $\lambda=0.5$ for $^{240}$Pu, but they went higher for $^{238}$U).
+
+\subsection*{6 September 2017}
+I'm trying to understand what would be making it so difficult for the DFT solver to handle the mass symmetric configurations of $^{294}$Og beyond about 500 barns, but not so much the mass asymmetric ones around $(Q_{20},Q_{30})=(600, 90)$. Witek suggests it might be a collapse of pairing, but I'm looking at the pairing gaps and pairing energies and it doesn't appear to be anything like that, since the pairing energies do not disappear. 
+
+\section*{Half-lives}
+\subsection*{20 June 2017}
+I'm trying to think about things to do to improve the half-life calculation. I talked a bit before (I think) about how small changes in the factor $\delta q$ used for the finite-difference approximation of the derivatives we need to compute the inertia can eventually lead to errors as great as two orders of magnitude in the half-life. And just in general, half-life calculations are not notoriously great. So what can we do to nail down some better certainties there? Well, hammering down on the precision of those derivatives is a good start (and it seems like it might provide a way to estimate uncertainties).
+
+Another possible fix might be to adjust that factor $n=10^{20.38} s^{-1}$ that just gets taken for granted. It could be that it's a good estimate, but that's something I'd like to decide for myself. I bet we could come up with a better estimate that is elongation-dependent (or perhaps even more complicated, but that seems like the best next-to-leading-order approximation).
+
+A third possible space for improvement is with the WKB approximation. The WKB approximation breaks down near the turning points. There are people on the internet who have devised workarounds:
+
+\begin{enumerate}
+\item \href{http://www.physicspages.com/2014/07/03/wkb-approximation-tunneling/}{Derivation of WKB approximation}
+\item \href{http://www.physicspages.com/2014/06/30/wkb-approximation-alternative-derivation/}{Alternative derivation of WKB approximation}
+\item \href{http://www.physicspages.com/2014/07/09/wkb-approximation-turning-points/}{WKB at turning points}
+\item \href{http://www.physicspages.com/2014/07/14/wkb-approximation-at-a-turning-point-with-decreasing-potential/}{WKB at a turning point with decreasing potential}
+\end{enumerate}
+
+\noindent One nice thing about the WKB approximation is that since it is based on a series expansion, you can estimate errors: \href{https://en.wikipedia.org/wiki/WKB_approximation#Precision_of_the_asymptotic_series}{WKB on Wikipedia}
+
+Yet another idea is to avoid the WKB approximation altogether. You could model the barrier as a series of rectangular barriers, for which you know the exact transmission probability. The total transmission probability through the whole barrier is then the product of all the individual, infinitesimal rectangular barriers. You'd need to use a ``product integral'' instead of the usual summation integral, and even then I'm not sure you could generate an analytic expression without knowing the analytic form of the potential. But numerically, I think you'd actually be fine, come to think of it. You could basically just change or add a couple of extra terms to your path program and I think it would work just fine. In fact, once I get the path program working, I think I'll do just that!
+
+\subsection*{29 June 2017}
+
+Just to make sure I have it somewhere, the formula for computing the tunneling probability through a rectangular barrier of width $a$ is
+
+\begin{equation}
+T = \frac{1}{1+\frac{V_0^2\sinh^2(k_1a)}{4E(V_0-E)}}, \qquad k_1 = \sqrt{\frac{2m(V_0-E)}{\hbar^2}}
+\end{equation}
+
+I'm not sure whether this only works for the case $E>0$. It'd be nice, on the one hand, to rescale everything to some zero-point energy defining your ground state. But then your particle has zero energy, which removes all the interestingness of the expression.
 
 \end{document}          
