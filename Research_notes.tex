@@ -1,7 +1,8 @@
 \documentclass[]{report}
 \usepackage[utf8x]{inputenc}
 \usepackage{hyperref}
-
+\usepackage{changepage}
+\usepackage{graphicx,subfigure}
 
 % Title Page
 \title{Lessons learned at LLNL}
@@ -40,6 +41,24 @@ Okay, well, let's hold on here. Say we take these, and we have some sense of wha
 \subsection*{18 May 2017}
 
 Just by way of update on the mass-symmetric(-ish) case: I brought the quadrupole deformation out to 400 and still no signs of splitting. The properties of the fragments are equilibrating so perhaps it won't scission until it is able to conserve energy by doing so? Which would probably mean redistributing energy amongst the particles for a bit longer and then it'll be ready to break apart.
+
+\subsection*{28 September 2017}
+
+Apparently I never wrote about this before, but I wanted to test just \textit{how} distinct fragment shell structures were, and whether you'd be able to identify the fragments based on the localization. So I looked at a few possible fragmentations of $^{176}$Pt, just to see what we could learn. Here I'll show the proton localization plots for the lighter fragment as an example (the rest are stored on my computer somewhere). The fragments I chose to show (based on some semi-arbitrary fragment trajectory in the PES) were $^{82}$Se, $^{84}$Se, and $^{86}$Zr. $^{84}$Se has a magic number of neutrons (N=50); $^{82}$Se is two neutrons shy of a full shell; and $^{86}$Zr, with Z=40 and N=46, is not particularly close to a full shell in either nucleon.
+
+\begin{figure}
+  \begin{center}
+    \subfigure[$^{86}$Zr]{\includegraphics[width=0.3\linewidth]{86Zr-p-locali.eps}}\label{fig:86Zr-p-locali}
+    \subfigure[$^{84}$Se]{\includegraphics[width=0.3\linewidth]{84Se-p-locali.eps}}\label{fig:84Se-p-locali}
+    \subfigure[$^{82}$Se]{\includegraphics[width=0.3\linewidth]{82Se-p-locali.eps}}\label{fig:82Se-p-locali}
+  \end{center}
+  \caption{Proton spatial localization}
+\end{figure}
+
+
+As you can see, at this level, the selenium isotopes are virtually indistinguishable. Of course, that should not be surprising, as the number of protons stays the same. However, even looking at the neutron spatial localizations doesn't change the conclusion too much. The signatures are different but I don't know if they're so distinct that I'd be able to distinguish between them in a pre-scission developing fragment.
+
+$^{86}Zr$ is distinct from the seleniums (as it should be, given that it differs by 6 protons). That said, I again don't know that I'd be able to pick them apart in a prefragment. Maybe.
 
 \section*{Impact of basis deformation on $E_{HFB}$}
 \subsection*{\date{1 March 2017}}
@@ -382,6 +401,8 @@ I'm really starting to think that the best long-term solution will be to just ad
 
 For the short-term, though, maybe it would be best, given the number of constraints we have - not to mention the time constraint - to more or less follow the Python thang. You've got 3 constraints $\rightarrow$ 6 neighbors (not counting pairing, which we can do in bulk). To maximize use of the nodes, that means using 6 processors per task (perhaps 3 MPI ranks per task since there are 3 constraints, with 2 OpenMP threads?). That means you're going to need as many nodes reserved as you have points in your PES - which is a LOT of nodes. Quartz has 2688 nodes; you have something like 2000 points \textit{per value of} $\lambda$! That means reserving all of Quartz for 2 hours times the number of pairing layers! It might be a bit faster since we're using the MANYCORES option, but still. I think you'd really need to break this down somehow, but I'm not sure of a good way to do it. Since pairing will have to be computed separately, you'll have to do the inertia separately, too.
 
+\subsection*{11 September 2017}
+I'm trying to figure out how to compute some kind of analytic or ``analytic'' derivative to the density from within the framework of HFODD. In the git code I have on my system, I'm looking through to find the instances of the variable \texttt{QASKED}, which stores the values you request for constrained multipole moments. The density will depend on those values somehow. And for some reason I have a file containing the variable \texttt{COFMUL}. It's been a few days and I'm not sure what that does anymore, though (see the explanation in the MOMETS subroutine).
 
 \section*{$^{294}$Og}
 \subsection*{10 April 2017}
@@ -448,10 +469,59 @@ I still won't get to this for a while yet, but I wonder about the formula for th
 
 \subsection*{7 August 2017}
 
-Just to update: I'm making progress on the 4D calculations. I had to cheat a little bit to get the constrained dynamical pairing correlations to work, but that seems to be resolved now so that's good. Restarting from $\lambda=0.0$, I got about 1070 points to converge for $\lambda=0.2$ with only about a seven or eight that aborted, and 948 for $\lambda=0.4$ ... The $\lambda=0.2$ calculations should finish pretty quickly based on where their convergence left off; the $\lambda=0.4$ might take a bit longer. I'm going to try the $\lambda=0.15$ set now just to see how quickly those converge, taking the $\lambda=0.2$ record files from which to restart. I'm also going to try starting $\lambda=0.5$ and $\lambda=0.6$ from the $\lambda=0.4$ record files because I think that'll help a bit (though not as much as the $\lambda=0.15$). I'm not sure exactly how high to go in $\lambda$... I think Jhilam said something about that once upon a time? Yes: you just have to check whether the min-action path touches the boundary (in $\lambda$) or not. I'll stop it at $\lambda=0.5$ and check (they didn't need more than $\lambda=0.5$ for $^{240}$Pu, but they went higher for $^{238}$U).
+Just to update: I'm making progress on the 4D calculations. I had to cheat a little bit to get the constrained dynamical pairing correlations to work (by manually fixing it in the code and recompiling it each time I need a different number), but that seems to be resolved now so that's good. Restarting from $\lambda=0.0$, I got about 1070 points to converge for $\lambda=0.2$ with only about a seven or eight that aborted, and 948 for $\lambda=0.4$ ... The $\lambda=0.2$ calculations should finish pretty quickly based on where their convergence left off; the $\lambda=0.4$ might take a bit longer. I'm going to try the $\lambda=0.15$ set now just to see how quickly those converge, taking the $\lambda=0.2$ record files from which to restart. I'm also going to try starting $\lambda=0.5$ and $\lambda=0.6$ from the $\lambda=0.4$ record files because I think that'll help a bit (though not as much as the $\lambda=0.15$). I'm not sure exactly how high to go in $\lambda$... I think Jhilam said something about that once upon a time? Yes: you just have to check whether the min-action path touches the boundary (in $\lambda$) or not. I'll stop it at $\lambda=0.5$ and check (they didn't need more than $\lambda=0.5$ for $^{240}$Pu, but they went higher for $^{238}$U).
 
 \subsection*{6 September 2017}
 I'm trying to understand what would be making it so difficult for the DFT solver to handle the mass symmetric configurations of $^{294}$Og beyond about 500 barns, but not so much the mass asymmetric ones around $(Q_{20},Q_{30})=(600, 90)$. Witek suggests it might be a collapse of pairing, but I'm looking at the pairing gaps and pairing energies and it doesn't appear to be anything like that, since the pairing energies do not disappear. 
+
+\subsection*{15 September 2017}
+Last week after talking with Witek, I put together a test run in the subfolder \texttt{.../Q30/pair\_test/}, where I turned on Lipkin-Nogami (but not really; I just used it for the dynamical pairing) with a fixed value of $\lambda_2=0.001$. A couple of my test points converged (and fairly quickly, too, though I'm not sure whether I had tried to make them converge before or not. Probably yes), but the rest diverged.
+
+I was looking back at my Google Keep notes yesterday from a few months back, and I saw basically the same issue with Witek suggesting a similar solution. There, he had suggested using a fixed pairing gap once the pairing gap dropped beneath 400 keV, which is indeed what has happened for the neutrons in some of this region. So I am retrying the points in \texttt{pair\_test} (with the two which converged replaced by two more nearby points). Except this time, instead of using Lipkin-Nogami with a fixed $\lambda_2$ (which, in hindsight, may have also been a bit too large), I'm fixing $\Delta_N=0.5$ (still letting $\Delta_P$ go free, since it was in no danger of disappearing in that region).
+
+I am curious, though: based on this particular PES, there are a surprising number of times when $\Delta_N$ and $\Delta_P$ vary inversely (one goes up while the other goes down). Is there a reason for this? Does it happen in other nuclei?
+
+\begin{adjustwidth}{1cm}{}
+\rightarrow\quad I can't get the parser to work properly, but my impression is that a similar thing happens in $^{176}$Pt. Not for every point, mind - there are clearly some where the proton and neutron pairing gap is similar. But there are also plenty of cases where they are even different \textit{signs}\dots which feels wrong, actually. So I dunno.
+\end{adjustwidth}
+
+\subsection*{19 September 2017}
+I did my calculation a few months ago with the finite differences spacing to see how it would affect the inertia. I knew the effect was somewhat large, but I did the tests on $^{240}$Pu originally, which scales differently than $^{294}$Og (so, for instance, a quadrupole moment spacing of 4 barns for plutonium is very different than a quadrupole moment spacing of 4 barns for oganesson). Witek was convinced that the spacing in my oganesson PES should be good enough to compute the inertia accurately as is but I wasn't convinced, based on my plutonium tests. So I ran a test point with a much finer spacing to compare to the coarse PES spacing that I already have. Only one of the coordinates has worked so far (because of a bunch of dumb reasons of things and me being dumb), and I was surprised to see how different the results were: 1.007517E-0002 for the fine spacing versus 1.745241E-0002 for the coarse grid. It's bad enough that I want to check the other coordinates again just to make sure.
+
+\subsection*{25 September 2017}
+\textbf{Re: 15 Sept 2017} There was no direct indication in the output files that the neutron pairing gap had been constrained to any particular value. Furthermore, all 9 of my test points diverged. Which, actually, may have been a sign of a constrained pairing gap after all: $\Delta_N$ suddenly tried to jump from like $0.1$ MeV to $0.5$ MeV. I could see how that might lead to a chaotic divergence. It might be preventable with a smooth application of the constraint, but I don't have a clear, simple way of doing that. Nor do I think the problem is so simple, because the pair gap values that the solution jumps between are nowhere near the requested value (nor are they so small as to create the problem Witek was suggesting).
+
+\subsection*{26 September 2017}
+I'm trying the same points as yesterday, except instead of fixing the pairing properties, I'm letting them go free and fixing triaxiality. It'll run for a few minutes with just a small triaxial push, after which it should release and go  settle into something more permanent. I only gave it a small triaxial bump because I didn't want to perturb the system so badly it would no longer resemble the restart file (almost a guaranteed convergence failure), but it's entirely possible I might miss a barrier and just slide back down where we started.
+
+\subsection*{28 September 2017}
+Something else I did was to look at the cluster decay fragments ($^{208}$Pb and $^{86}$Kr), and compare them to the prefragments using the NLF Chunli developed. It looked pretty much the same, honestly, which is good. But one thing I noticed that I hadn't noticed before is that the shape of the proton spatial localization was very different than the shape of the neutron localization, even for the same nucleus ($^{86}$Kr) at the same deformation. I asked Witek if this was evidence for a collective excitation where the protons and neutrons undergo some quadrupole vibration independently of one another, and he said yes. The word he used, I believe, was ``isovector vibration'' or something like that. So that's a word I need to learn, but at least it seems like a good result!
+
+\subsection*{29 September 2017}
+Studying up some more on cluster emission, I decided to look back at some of my other localization plots to see if there was any evidence of shell formation early on in the trajectory. And sure enough, you can see evidence of shell formation of both the krypton and the lead in the neutron spatial localization as far back as the outer turning point, which is when I started storing my localization files. You can also see a proton shell starting to form in the lead, but it's not so clear in the krypton. This kind of makes sense, I guess: $^{86}$Kr has a magic number of neutrons but not protons, while $^{208}$Pb is magic in both neutron and proton numbers.
+
+\begin{figure}[h!]
+  \begin{center}
+    \subfigure[$Q_{20}=140 b, Q_{30}=24 b^{\frac{3}{2}}$\newline (just beyond the outer turning point)]{\includegraphics[width=0.3\linewidth]{294Og-140024n-locali.eps}}\label{fig:294Og-140024n-locali}
+    \subfigure[$Q_{20}=200 b, Q_{30}=44 b^{\frac{3}{2}}$]{\includegraphics[width=0.3\linewidth]{294Og-200044n-locali.eps}}\label{fig:294Og-200044n-locali}
+    \subfigure[$Q_{20}=264 b, Q_{30}=60 b^{\frac{3}{2}}$\newline (just before scission)]{\includegraphics[width=0.3\linewidth]{294Og-264060n-locali.eps}}\label{fig:294Og-264060n-locali}  \end{center}
+  \caption{Neutron spatial localization for $^{294}$Og. Shells are already starting to develop as early as just beyond the scission point}
+
+%\end{figure}
+%
+%\begin{figure}[h!]
+  \begin{center}
+    \subfigure[$Q_{20}=140 b, Q_{30}=24 b^{\frac{3}{2}}$ (just beyond the outer turning point)]{\includegraphics[width=0.3\linewidth]{294Og-140024p-locali.eps}}\label{fig:294Og-140024p-locali}
+    \subfigure[$Q_{20}=200 b, Q_{30}=44 b^{\frac{3}{2}}$]{\includegraphics[width=0.3\linewidth]{294Og-200044p-locali.eps}}\label{fig:294Og-200044p-locali}
+    \subfigure[$Q_{20}=264 b, Q_{30}=60 b^{\frac{3}{2}}$ (just before scission)]{\includegraphics[width=0.3\linewidth]{294Og-264060p-locali.eps}}\label{fig:294Og-264060p-locali}  \end{center}
+  \caption{Proton spatial localization for $^{294}$Og. Note that the lead proton shell starts to develop early, but the krypton proton shell doesn't develop until much later}
+\end{figure}
+
+\subsection*{2 October 2017}
+One more comment I want to make clear about the plots from the previous entry: some models of cluster emission treat the system as a preformed smaller fragment trying to escape from the larger fragment. What these plots seem to show is almost the opposite, where you have a well-formed core trying to shed its excess nucleons.
+
+\subsection*{4 October 2017}
+\textbf{Re: 26 September 2017} I got back the results from giving the system a small, triaxial boost. It seems to have worked from a software perspective - they all reported back non-zero values for $Q_{22}$ - but in the end, everything still diverged. Also, it's entirely possible the boost wasn't enough - maybe there's a large triaxial barrier and $Q_{22}=3$ just wasn't enough to make it to the other side. So I guess that's the next thing I'll try. Instead of $Q_{22}=3$, I'm going to try it with $Q_{22}=30$. That might well fail, as well, just because of the jump, but it's something to try, right? And I'll do it with 10 iterations of ``pushing'' instead of 5.
 
 \section*{Half-lives}
 \subsection*{20 June 2017}
@@ -481,5 +551,15 @@ T = \frac{1}{1+\frac{V_0^2\sinh^2(k_1a)}{4E(V_0-E)}}, \qquad k_1 = \sqrt{\frac{2
 \end{equation}
 
 I'm not sure whether this only works for the case $E>0$. It'd be nice, on the one hand, to rescale everything to some zero-point energy defining your ground state. But then your particle has zero energy, which removes all the interestingness of the expression.
+
+\section*{Miscellaneous}
+A place for all the random things you learn that you don't necessarily have a place for elsewhere in the notes, but you want to put them somewhere. Like the days when you read a lot of papers and you don't want to forget what you've learned.
+
+\subsection*{3 October 2017}
+One paper I read today was about using some flow equation to derive a new nuclear energy density functional (not - so far as I can tell - based on Skyrme or Gogny [at least not yet]). The nice thing about this scheme is that it has a built in truncation scheme, which is great for uncertainty quantification and error analysis and whatnot. I don't really understand what they did but it'll be interesting to see if it leads to anything better (although looking back on it, I don't see that they've specified a potential, so perhaps we'll be stuck with Skyrme or Gogny on some level after all...) See https://arxiv.org/pdf/1709.09143.pdf
+
+I also spent a fair bit of time reading through a paper about correlated prompt fission data in transport simulations. What these codes try to do is predict the number, energy distribution, and maybe spin/angular momentum/directional/etc. properties of prompt neutrons, gamma rays, emitted in fission, given a fragment yield and a total kinetic energy as an input (basically). The mechanism on which these codes are based is Hauser-Feshbach, which is a reactions formalism that handles compound nuclei: given some total cross section, try to reconstruct the possible input channels and their weights (or something like that). There's a lot of stuff I don't understand about it, but at least it gives me something I can refer to when people ask me questions about scission neutrons and fragment angular distributions and whatnot. See https://arxiv.org/pdf/1710.00107.pdf
+
+I showed Witek my cluster plots for 294Og and he wasn't at all surprised that the krypton protons took forever to coalesce into their shell configuration, but he did point out what I'd already basically noticed: that it's apparently easier for heavier nuclei to emit clusters.
 
 \end{document}          
