@@ -24,7 +24,7 @@ The more mass-asymmetric case ended up shifting from $Q_{30}=18$ to a little ove
 
 In the more mass-symmetric case (but still with $Q_{30}\neq0$), it actually appears that the system chose to produce two equal-mass fragments ($^{88}$Y), and then to just deform one of them more than the other. So even though their mass and charge distribution is symmetric, the kinetic energy distribution is not.
 
-Now, what I'm wondering is what is the benefit to all of this? I think the goal was that it would be nice to be able to identify fission fragments well before scission. Well, let's look at the output files I actually saved (why did I not think to save them all?! \frown). In the symmetric case, at $Q_{20}=285b$, the calculation actually failed to converge because the number of iterations was reached. But we did get an output, and according to that output the ``prefragments'' at that stage were $^{96}$Tc and $^{80}$Br. $Q_{20}=300b$ also failed to converge, and also gives two asymmetric fragments ($^{91}$Nb and $^{85}$Rb, but the localization plots \textit{look} symmetric, in case that means anything). When I got around to doing $Q_{20}=315b$, the fragments are actually \textit{still} not symmetric (according to the fragment toolbox) (I'll just print the output here):
+Now, what I'm wondering is what is the benefit to all of this? I think the goal was that it would be nice to be able to identify fission fragments well before scission. Well, let's look at the output files I actually saved (why did I not think to save them all?! $\frown$). In the symmetric case, at $Q_{20}=285b$, the calculation actually failed to converge because the number of iterations was reached. But we did get an output, and according to that output the ``prefragments'' at that stage were $^{96}$Tc and $^{80}$Br. $Q_{20}=300b$ also failed to converge, and also gives two asymmetric fragments ($^{91}$Nb and $^{85}$Rb, but the localization plots \textit{look} symmetric, in case that means anything). When I got around to doing $Q_{20}=315b$, the fragments are actually \textit{still} not symmetric (according to the fragment toolbox) (I'll just print the output here):
 \begin{verbatim}
 *   -----------------------------------------------------------------------   *
 *             |   LEFT  FRAGMENT (z < zN)   |   RIGHT FRAGMENT (z > zN)       *
@@ -241,7 +241,7 @@ I ended up getting by it for the time being by just probing \texttt{ps} every 60
 
 And with that, I have a launch mechanism! Thank heavens I can move on now! Now to build the rest of that Python launch script (not to mention finishing up those point-based utilities)...
 
-And the nice thing is that this is fairly portable. FOr a system that uses mpirun/mpiexec instead of srun, you can chain jobs together like this:
+And the nice thing is that this is fairly portable. For a system that uses mpirun/mpiexec instead of srun, you can chain jobs together like this:
 
 \begin{verbatim}
 shell$ mpirun -np 2 a.out : -np 2 b.out
@@ -269,8 +269,9 @@ For $T=1$ and cutoff$=10^{-13}$, the inertia I got was \verb|-2.075285E-0001|, w
 
 Okay, here's sort of a summary table. $\delta q$ refers to the separation between points used to calculate the derivatives $\frac{\delta \mathcal{R}}{\delta q}$. The numerator cutoff refers to whether or not I truncated the numerator (the densities) to the same level that I truncated the $f_a-f_b$. On the one hand, you could claim they should be truncated because there's a lot of complicated expressions leading into them and you can't really trust the results beyond a certain point; on the other hand, these numbers aren't the ones that seem to be causing the problem - it's the $f_a$'s!
 
-\begin{tabular}{|c|c|c|c|c|}\hline
-Temp & cutoff & Numerator cutoff? & \delta q & $\mathcal{M}_{20,20}$ \\ \hline\hline
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+$\mathrm{Temp}$ & $\mathrm{cutoff}$ & $\mathrm{Numerator\ cutoff?}$ & $\delta q$ & $\mathcal{M}_{20,20}$ \\ \hline\hline
 0      &  none       & no   & 0.5  &  1.618428E-0002  \\\hline
 0      &  $10^{-13}$   & yes  & 0.01 &  1.549012E-0002  \\\hline
 0      &  $10^{-15}$   & yes  & 0.00001* &  0.000000E+0000  \\\hline
@@ -482,7 +483,7 @@ I was looking back at my Google Keep notes yesterday from a few months back, and
 I am curious, though: based on this particular PES, there are a surprising number of times when $\Delta_N$ and $\Delta_P$ vary inversely (one goes up while the other goes down). Is there a reason for this? Does it happen in other nuclei?
 
 \begin{adjustwidth}{1cm}{}
-\rightarrow\quad I can't get the parser to work properly, but my impression is that a similar thing happens in $^{176}$Pt. Not for every point, mind - there are clearly some where the proton and neutron pairing gap is similar. But there are also plenty of cases where they are even different \textit{signs}\dots which feels wrong, actually. So I dunno.
+$\rightarrow$\quad I can't get the parser to work properly, but my impression is that a similar thing happens in $^{176}$Pt. Not for every point, mind - there are clearly some where the proton and neutron pairing gap is similar. But there are also plenty of cases where they are even different \textit{signs}\dots which feels wrong, actually. So I dunno.
 \end{adjustwidth}
 
 \subsection*{19 September 2017}
@@ -540,7 +541,70 @@ Interestingly, even though some of those points converged, I was able to take th
 
 However, if you subtract off the Lipkin energy from the total energy (see eqn 6.1 in my notes, or roughly I-9, VI-96 in the original HFODD papers), you see that the total energy \textit{before} the Lipkin-Nogami correction bottoms out around the self-consistent minimum value of $\lambda_2$ (of course, there will also be a slightly different self-consistent minimum if you run the code without Lipkin-Nogami or dynamical pairing [$\lambda_2=0$]).
 
-\section*{Half-lives}
+\subsection*{5 February 2018}
+It's been a while since I wrote, but I've got some things worth recording.
+
+As far as I can tell, I have a minimum-action pathway/half-life code that seems to do a reasonably-good job finding minimum action pathways, but a less good job finding half-lives. It still isn't a totally-settled deal - one thing we can adjust is the zero-point energy or the energy of the ground state. Changing the $E_0$ which appears in the action integral by something like 0.1 MeV can alter the half-life by a factor of like 2 or 4 (depending which way you go). Not enough to account for my results, unfortunately, but something (and actually, in the case of oganesson, it might change my results in the opposite direction to what I need).
+
+One problem we encountered was that we were getting $M_{eff}<0$ at some points, which is of course ridiculous! Presumably these points correspond to some kind of level crossing between points on the potential energy surface (recall that components of the inertia tensor were computed using finite differences). There are probably a number of ways I could have resolved the issue (apparently Jhilam just replaced the negative values with zeros, which makes me just a little uncomfortable), but I settled on writing a Python script that checked the value of $M_{eff}$ along each possible direction (as determined by the action minimization code using chiefly the parameters \texttt{b\_span} and so on). If a point has $M_eff\geq0$ along every possible trajectory, it is rewritten into a new, filtered input file; otherwise it is discarded. This unfortunately eliminates roughly $\frac{3}{4}$ of the data I collected. I can still use my full interpolated PES by running the code first using the unfiltered input file, saving \texttt{EHFB\_int.out}, and using it to jumpstart the next run, but unfortunately a lot of that inertia data is simply lost to time. It might be worth seeing which points I do manage to keep, in order to know if my subsequent inertia is reasonable or not. That would be a good thing to check.
+
+In any case, using the inputs as presently constituted, I computed the half-life (and the pathways) in 2-, 3-, and 4-D space using the collective coordinates $(((q_{20},q{30}),q_{22})\lambda_2)$. The results I get currently are:
+
+\begin{list}{}{Half-lives in 2, 3, and 4 dimensions:}
+\item 2D $(q_{20},q_{30}); q_{22}=3, \lambda_2=0$:    1305504.9263348267     
+\item 3D $(q_{20},q_{30},q_{22}); \lambda_2=0$:    3.8268163795048664E+022
+\item 3D $(q_{20},q_{30},\lambda_2); q_{22}=3$:    9.4084322399806967E-012
+\item 3D $(q_{20},q_{22},\lambda_2); q_{30}=0$:    4.9637739301242774E-011
+\item 4D $(q_{20},q_{30},q_{22},\lambda_2)$:       3.8820411419017089E-012
+\end{list}
+
+\subsection*{6 February 2018}
+I plotted the inertias that made it through the filter (in particular, in the 3D case). There's enough to capture sort of the bulk properties of the PES, but it depends on which layer (which value of $q_{22}$) you're looking at. The parts that I'm most worried about are probably the barrier(s), and you can kind of see them but not in any clear detail. Is that enough? I dunno. I don't even know what that means...
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth]{post_filtering_nans}
+\caption[Points with $M_{eff}>0$]{Points with $M_{eff}>0$ (and all NaNs filtered out) shown for several values of $q_{22} (q_{22}=3,24,36,45)$}
+\label{fig:post_filtering_nans}
+\end{figure}
+
+\subsection*{7 February 2018}
+My abs are so sore! But that's not relevant...
+
+I did the 4D path calculation again, but this time I added/subtracted 100 keV to the ground state energy in the action integral to see the effect on the half-life. Pretty much as expected, but now I know. The problem, though, (and as I may have said before) is that my half-life is already too small. Increasing $E_0$ (which is what Witek suggested doing) just makes it smaller.
+
+Just out of curiosity, I also decided to try out my alternative way of computing the tunneling probabilty. That, too, is shown below.
+
+\begin{list}{}{Half-lives with different ground state energies:}
+\item $\sqrt{V-E_0-0.1}$:    4.5456834751698960E-013
+\item $\sqrt{V-E_0}$:    3.8820411419017089E-012
+\item $\sqrt{V-E_0+0.1}$:    1.9654750844481639E-010
+\item $\sqrt{V-E_0+0.5}$:    4.8651043198529695E-007
+\item Alternative tunneling prob.: Nonsense. It really depends a lot on your choice of $E_{ZPE}$
+\end{list}
+
+Also perhaps worth noting is the fact that the minimum action trajectory sometimes changes depending on your ground state energy offset. Most of them claim to stay fairly mass-symmetric and very triaxial (Really? Huh. That's interesting), but there are exceptions.
+
+\subsection*{5 April 2018}
+Samuel generated a 2D PES for $^{294}$Og using the Gogny D1M force using a perturbative recipe for the inertia. Using the values he gave me I computed a value for the half-life of Oganesson:
+
+\begin{list}{}{Half-life in 2 dimensions from Gogny:}
+\item 2D (no ZPE) $(q_{20},q_{30})$:        30786236776.996628 (3.1x10^10)
+\end{list}
+
+I'm running into some kind of problem when I try to add in the ZPE, which may owe to the fact that apparently I don't know what the ZPE is after all. Also, when I compared Samuel's input data to my own, I noticed that while $M_{q2q2}$ is of approximately the same magnitude in both cases, the other two components are roughly an order-of-magnitude larger in my file than in his. What's up with that? Did I convert from Fermis to barns wrong with Samuel's data? Or did I do something dumb with my data? Or are the data really just that different?
+
+\subsection*{11 April 2018}
+I added a little workaround in order to use ZPE corrections to the ground state (the real fix is going to take a little bit of work, though nothing too terrible). With a ZPE correction of 0.5, I now get:
+
+\begin{list}{}{Half-life in 2 dimensions from Gogny, take 2:}
+\item 2D (ZPE=0.5) $(q_{20},q_{30})$:        9837943407.0663910 (9.8x10^9)
+\end{list}
+
+Sooo... Slightly-better...
+
+Importantly, though, the exit point changes significantly with that correction, though. Before, it was exiting along the symmetric path. But with the added 0.5 MeV correction, it now exits along the cluster path. Interesting...
+
+\section*{How to compute half-lives}
 \subsection*{20 June 2017}
 I'm trying to think about things to do to improve the half-life calculation. I talked a bit before (I think) about how small changes in the factor $\delta q$ used for the finite-difference approximation of the derivatives we need to compute the inertia can eventually lead to errors as great as two orders of magnitude in the half-life. And just in general, half-life calculations are not notoriously great. So what can we do to nail down some better certainties there? Well, hammering down on the precision of those derivatives is a good start (and it seems like it might provide a way to estimate uncertainties).
 
