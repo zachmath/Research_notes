@@ -1,0 +1,98 @@
+\chapter{Impact of basis deformation on $E_{HFB}$}
+\maketitle
+
+\subsection*{\date{1 March 2017}}
+We wanted to see how much the observables of the system would change if we used a single HO basis across an entire PES. This is based on a misunderstanding I had of something Jhilam said, where in order to use his inertia code, you need adjacent points to have the same basis deformation and other basis properties (so that you can numerically take derivatives of the densities at those points). It turns out he gets around this problem by changing the basis every 30b along Q20, but all the same we thought it would be good to check the dependence of system observables on the basis, especially since the half-life is so dependent on small deviations in the potential energy (a change of 1 MeV can affect the half-life by orders of magnitude).
+
+To test, I took three points on the PES I had generated for $^{294}$Og: (-14, 0), (72, 0), and (148, 28). According to the output file, the basis deformation chosen for each of these (by the automatic basis setting routine in HFODD) was, respectively, AL20 = 0.187, 0.424, and 0.608. I took those record files and used them to restart a new calculation, this time with the basis deformation set uniformly to AL20 = 0.61 (and AL40 = 0.10). The superdeformed asymmetric shape was, understandably, least affected by the change, with the kinetic energy varying by about 3 MeV but the total energy varying by only about 0.14 MeV (-2085.878548 vs -2086.012955). Quasiparticle and canonical single-particle states were nearly identical, and fragment properties were almost the same (except for the interaction energies, which were quite different). The elongated symmetric shape differed by about 0.6 Mev (-2080.815396 vs -2080.202346). The oblate ground state didn't converge in the allotted time, but based on its last iteration it was probably going to finish with an HFB energy around -2078.649984 (compared to -2080.263986 from before), a difference of about 1.6 MeV.
+
+\subsection*{3 March 2017}
+I've written a Python script which extracts the basis parameters from a previous run of HFODD, and uses it to initialize a new run for several neighboring points in order to facilitate an inertia calculation down the line. A problem we noticed, though, was that, while setting the $\alpha_2$ deformation parameter worked fine, the basis was totally different because there was an additional constraint on $\alpha_4$. It turns out that what had happened is that the code automatically sets default values of $\alpha_2$ and $alpha_4$, UNLESS you set the code to choose the basis automatically, in which case it only sets a value for $\alpha_2$. You can get around that by deleting the preset line in HFODD and recompiling, but I'd like for there to be an easier way. Perhaps the basis matrix is initialized to zero? So we could get around it by just setting $\alpha_4=0$ in the input file? $\Rightarrow$ Aha, yes. That'll work. So we're benchmarking the time on that now.
+
+Another thing we're testing is comparing versions of the inertia code. Jhilam sent Nicolas an input and an output for $^{240}$Pu. I'm running a single point now. Later, I'll run the surrounding points using both my convention and Jhilam's for how widely-spaced the points should be. I'll also compare the inertia computer with the code Jhilam sent me versus the one in Nicolas' repository.
+
+Unfortunately, this run uses Lipkin-Nogami, and for some reason the parser doesn't write the data to the XML file, which ultimately means I'm going to have to set up the subsequent runs by hand. The question is whether to do so using Jhilam's convention (for benchmarking purposes) or the one Nicolas and I talked about (where the points are much closer and you might get a better value for the inertia). Computing the neighboring runs will probably still take a similar amount of time (it took roughly 50-60 iterations for a deviation of about 0.001 units in each direction. It'll probably be more for something farther away but if you already have those computed anyway it might not be such a big deal).
+
+So I went ahead and did that. Once those jobs complete, we can try to analyze the inertia using each of the inertia codes, just to make sure they both give the same results. I used Jhilam's grid spacing, but we can try it again later with the narrower grid spacing once we see how long it takes for these points (which have a grid spacing of 1 in the multipole constraints, and 0.1 in the pairing constraints) to converge and then decide if using the narrower grid is economical and useful. Actually, this would be a good test case for that; if we see a noticeable improvement in accuracy, then the extra time-to-solution for the narrower grid might be worthwhile.
+
+Of course, to do that we'll need working inertia codes. Right now, I don't undertand why, but for some reason we're getting some kind of runtime error in LAPACK:
+
+$\mathtt{Intel MKL ERROR: Parameter 8 was incorrect on entry to ZGEMM}$
+
+\subsection*{6 March 2017}
+Today I worked on two computational problems: the large number of iterations, even for a small perturbation from the record file's original point; and benchmarking a working inertia calculation against Jhilam's results.
+
+For problem \#1, I noticed that even after setting the basis parameters manually in the input file, I was still seeing that a different basis was used during the run and [consequently?] these were still taking ~70-80 iterations to converge. I showed Nicolas and he had me flip a Lagrange multiplier continuation switch in the input file, but I've re-run the code since then and the problem still exists, that the new run uses a slightly different basis than the original. and it still takes ~70-80 iterations to converge.
+
+For problem \#2, I compiled the code for a 3D benchmarking run to compare with Jhilam's results. The code runs without that weird MKL error I was getting, but the results are incorrect.
+
+I'm getting:
+\begin{equation}
+77.00\    1.00\    2.00\   -1801.146627 \\
+0.000000\    0.598205\    0.598233\    0.000000\    0.000000\    0.598219
+\end{equation}
+whereas Jhilam is getting:
+\begin{equation}
+77.00\    1.00\    2.00\   -1801.183 \\
+0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
+\end{equation}
+
+\subsection*{7 March 2017}
+Today, after modifying the input file and doing some debugging, I'm getting:
+\begin{equation}
+0.011378\    0.034354\    0.000000\   -0.001988\    0.000000\    0.000000
+\end{equation}
+\noindent which is within 0.001 across the board. So not bad, but not exact, either. My question now then is if this is something that should be exactly deterministic. I'd think that it should be, yes. The max basis size has changed at compile time but I don't think that affects the final results. $\Rightarrow$ Ah. I think the problem is that I changed the basis characteristics in the input file to HFODD. I calculated the surrounding points using the basis from the centerpoint. Which, I suppose is useful to know... In fact, yes, I did that because we need the basis to be the same, no? So in order to reproduce Jhilam's exact results, we'd need to know his exact basis.
+
+Pending that, I think I officially have a working inertia code. There are some nice things I can do to streamline inertia calculations, probably within Python as opposed to Fortran, but for now it's something to start with.
+
+I'm still not sure what's going on with the other thing, with the basis getting changed even after setting it manually. I even tried another run setting INPOME=0, just to see what would happen (even though I expected that to make it worse), and frankly I didn't see a difference (the output files reported the same wrong basis).
+
+When you come in tomorrow, the things to work on should be: 1) spend the morning working on deriving the ATDHFB inertia, then 2) in the afternoon, talk to Nicolas about the inertia code you got working (maybe Jhilam will have sent you a basis to use), and perhaps see if Nicolas has any additional insight on the basis problem you're seeing here.
+
+\subsection*{8 March 2017}
+Good news: Nicolas figured out what was happening with the basis. Apparently there were rounding truncation errors that popped up when the parameters FCHOM0 and AL20 were written to file, and the line FREQBASIS isn't even read at all. Going back into the source and figuring out how FCHOM0 and AL20 were computed for the centerpoint, and plugging these values into the input file with lots of decimal points seems to have solved the problem. It still takes several iterations to converge, but it will hopefully be faster than before (it's still running so we'll see).
+
+The formulae you'll ultimately need to implement in your Python script for preserving the basis are the following:
+
+\begin{eqnarray}
+\omega_0        =& 0.1q_{20}e^{-0.02q_{20}}+6.5 \\
+\mathtt{FCHOM0} =& \frac{\omega_0}{\left(\frac{41}{A^\frac{1}{3}}\right)} \\
+\alpha          =& 0.05\sqrt{q_{20}}
+\end{eqnarray}
+\noindent where $q_{20}$ refers to the quadrupole deformation of the centerpoint.
+
+\subsection*{9 March 2017}
+Aha! Figured out what was causing the ZGEMM error in the inertia file. I was using a max basis size of 1200 when I compiled the inertia code (as defined in hfodd\_sizes\_....f90), but the particular matrices I was trying to multiply were created using a basis size of like 1600. So that's resolved. One thing, though, is that, while it gives the same results as the 3D case, they are in a different order. So that's something you should clean up in the code. 
+
+Additionally, I've redone the calculations for the inertia benchmark, this time using the correct basis for the points surrounding the center point, and fixing whatever Lipkin-Nogami problem I was having, and this is what I get:
+\begin{equation}
+0.011719\    0.034843\    8.287077\   -0.002180\   -0.054160\    0.020690
+\end{equation}
+\noindent with $E_{HFB}=-1801.146627$ Again, for reference, here are Jhilam's results:
+\begin{equation}
+0.010463\    0.033608\    0.000842\   -0.001305\   -0.000412\    0.000152
+\end{equation}
+Without Jhilam's basis, we still don't have his result (in fact, it's even further than it was before). But the biggest problem is in that $\lambda$ variation somehow. Still not sure what's going on with that.
+
+Just judging from the outputs, it looks like everything converged properly and the results make sense (energies were approximately the same, particularly for those which did not explicitly involve pairing; unconstrained multipole moments are approximately the same as far as I can see). Could it be that I put the qp files out of order? I have the magnitudes right for sure (lambda changes by 0.01; the Lagrange coefficient magnitudes for equally-spaced grid points go as $\pm\frac{1}{2\delta q} = \frac{1}{0.02}=50$). I'm running it now with the signs switched, just in case I had them backwards somehow. 
+
+\begin{equation}
+0.011719\    0.034843\    8.287077\   -0.002180\    0.054160\   -0.020690
+\end{equation}
+
+\noindent But if that doesn't work (which it didn't), then perhaps it's a problem related to the parameter I switched? Is there a modification to the formula when you change $\lambda$ instead of a multipole moment? Did I change the wrong $\lambda$? Was I only supposed to change $\lambda$ for protons $\mathit{or}$ neutrons but not both?
+
+\subsection*{10 March 2017}
+Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$, he would have used the basis corresponding to $Q_{20}=60$ (as far as FCHOM0 and $\alpha_{20}$ are defined). In general, his method is to round down to the nearest multiple of 30. With this I get:
+
+\begin{equation}
+0.011663\    0.034763\    8.610518\   -0.002182\   -0.054110\    0.020785
+\end{equation}
+
+\noindent with $E_{HFB}=-1801.173695 MeV$
+
+\subsection*{13 March 2017}
+It seems there's no problem with the $\lambda$ terms in the inertia output (at least, not one unique to just the pairing terms).  The issue there is that Jhilam normalized his coordinates in the end, such that $\delta x=1$ for every collective coordinate instead of the $d\lambda=0.01$ I'm using. Since this only affects the denominator in my derivatives $\frac{\delta \rho}{\delta q}$, this means shifting the decimal point over by 2 slots (or 4 in the $\lambda-\lambda$ case) for the pairing terms.
+
+So it $\mathit{looks}$ like the inertia code is working. Everything is correct to within ~20\% compared to Jhilam's result. But it would be good to make absolutely sure, which means examining Jhilam's output files, if possible. 

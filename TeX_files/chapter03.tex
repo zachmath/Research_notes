@@ -1,0 +1,249 @@
+\chapter{Inertia Wrapper}
+\maketitle
+
+\subsection*{17 March 2017}
+The past couple days you've been working on parallelizing the inertia routine, and figuring out how to quickly setup runs for the "satellite" points on your PES. You've got some scripts that will help, although between writing them a couple days ago and using them now, it seems you've already sort of forgotten what they need to work - or rather, you see that they aren't quite as universal as you were hoping. You need an XML file, which needs output files. If you have a big XML file and need to split it up, you did that by hand today but I'm guessing there's an easier way. But it looks like you WILL need to do some splitting up. Not the way you had originally anticipated, where you submitted a job for every single point on the PES to have its satellites computed. But since the speedup for using nearby points only seems to occur when you use the same basis as the centerpoint, this means that you have to group centerpoints by $Q_{20}$. That'll reduce the number of jobs on Quartz by ~15, but it's still a nuisance.
+
+Anyway, you've done that for values of $Q_{20}$ between 0 and 8, and you're waiting for those to complete (hopefully they'll take less than 3hrs!). Once they do, you can test out your post-run\_whatever.py Python script to see if it really \textit{does} group things nicely. You should have it generate the inertia input file, with multipole moments, Lagrange coefficients, and file names correctly and automatically (it's mostly there already; I think you just need to add the multipole constraints). And then you can test out your MPI version of the inertia code. You've tested it and it works when compiled and run serially (at least, it gives the same results as before, which you'll assume are correct until you hear back from Jhilam).
+
+\subsection*{21 March 2017}
+When you get around to setting up your inertia wrapper, I think the nicest and most user-friendly thing you could do would be to activate the Python setup script.
+
+\begin{enumerate}
+\item It should take as inputs the XML file and the directories containing record, qp, and maybe output files (and Lipkin files if you're into that kind of thing).
+\item[Note] Whatever naming scheme you use, it should be independent of the indexing scheme used originally.
+\item It'll create and populate directories for each $Q_{20}$ value, create path and path\_new files for each directory that HFODD can use to calculate the neighbors.
+\item Then it'll create the SLURM batch script (with multiple SRUN commands) that HFODD will use to compute the neighboring points.
+\item Once HFODD is done, those same MPI ranks will collect the outputs into their proper folders with their proper names. Python will create input files for the inertia code in each subdirectory. Then it will run the inertia code on a subdirectory level.
+\item After the inertia code completes on a subdirectory level, the results (and perhaps the output files if you're into that kind of thing) will be collected and compiled into the parent folder, and a master output file will be created.
+\end{enumerate}  
+
+\subsection*{28 March 2017}
+I haven't really explained what I've been up to for the past several days (or at least, I haven't committed my thoughts from my notebook to my computer). After discovering that much of the inertia wrapper I was trying to develop had already been done more cleanly by Nicolas, this week I've started developing a new Python class called Point, which corresponds to a single point in the PES. I'm going to give it some neat methods that will sort of streamline the creation of neighboring jobs and such. Right now, I've successfully been able to initialize an instance of Point from an instance of DataFile (just by picking one of them out randomly). The script which was able to do that is the following:
+
+\begin{verbatim}
+from pes import * 
+from collections import defaultdict,Counter
+oldpoint = Point('294Og_PES.xml', 176, 118, var=('q20','q30'))
+tree = oldpoint.ReadFile()
+glob_dico = oldpoint.GetGlobal(tree)
+dico = {}
+dummy = oldpoint.GetVariable(tree, val='id')
+dico['id'] = dummy['id']
+for constraint in oldpoint.var:
+	dummy = oldpoint.GetVariable(tree, val=constraint)
+	dico[constraint] = dummy[constraint]
+	
+dico_arr = {}
+for observable in ['EHFB', 'Z1', 'A1', 'zN', 'qN', 'D']:
+	dummy = oldpoint.GetVariable(tree, val=observable)
+	dico_arr[observable] = dummy[observable]
+	
+newpoint = oldpoint.CreateNewPoint(glob_dico, 0, oldpoint.var, dico, dico_arr, 0)
+\end{verbatim}
+
+One complication that arises, however, is that in order for this to work as currently written, the old point must be initialized from the entire XML file, and that XML file must currently be an element in the Point class (which technically is possible but it sort of violates the goal of the project). It would be nice to have a method which truly takes an actual DataFile and spits out a Point. What you might consider doing is generating a DataFile from a DataFile, and then taking the output DataFile and using it to initialize a Point afterwards. Anyway, something to think about.
+
+\subsection*{29 March 2017}
+
+Welp, it turns out I've been working on an outdated branch of the PES module. I got access to the latest one today and spent the afternoon familiarizing myself with what's new. It seems really nice and sleek, so I think it should be pretty easy to work with and adapt what I've been doing. Now I just need to spend some time figuring out what changes.
+
+And I had \textit{just} gotten my instance of \texttt{Point} to initialize from a \texttt{DataFile}...
+
+\subsection*{31 March 2017}
+
+So the good news is I've created a successful Point class in the new \texttt{pes\_tools} module, and you can specify a set of constraints with their values and it'll spit out an XML tree for that particular point. You can also find neighbors surrounding that point as XML trees, the idea being that you can feed them into input files for use in an inertia calculation.
+
+The thing is it all feels so stupid. It's been done already! Why does it need to be done again? Indeed, this will look a little bit cleaner, hopefully. Then your actual inertia\_setup script can probably be actually pretty short. You'll still have to deal with file movement, but a lot of things will be moved behind the scenes into the various pes module methods.
+
+The toughest spot will be the part you've been avoiding the most: figuring out how to divide up a whole large reservation of processors to cover the entire PES efficiently and without overlap. You can fit 3 neighborhoods per node (assuming 4 neighbors per neighborhood and 3 OpenMP ranks per task = 12 tasks per neighborhood, with 36 possible tasks per node). Just FWIW, assuming something like 830 neighborhoods (which is roughly what you've got right now for $^{294}Og$), that's going to require $830/3 \approx 277$ nodes. Estimating walltime, I'd give yourself something like an hour and a half to two hours to do the HFODD run for the neighborhood, and another half hour to do the inertia calculation. Three hours \textit{should} be more than enough time to do it all. I say "should" because these SLURM emails sitting in my inbox report inertia calculation times closer to an hour and a half, for the HFODD portion, but they never actually completed the inertia calculation (I was trying to do them all at once, but it's probably best to just do it by neighborhood, rather than for a whole slice of neighborhoods).
+
+Whatever script you end up creating, you should make it modular and flexible enough that you can pin a path calculation onto the end of it without too much trouble. And it should work in any number of dimensions (which thankfully, so far it does. Your other script would have taken some real tweaking for that to happen, though). The one place where this might struggle is when probing along the pairing parameter. I imagine you could tweak that, too, without it being a huge problem, but that's going to take some thought. Most likely everywhere you have a loop over \texttt{collective\_variables}, you'll need to stick an \texttt{if q == lambda\_n or q == lambda\_p} statement in there.
+
+\subsection*{7 April 2017}
+Holy crap, it's been another week! Welp, in any case, I think I'm going to give up trying to get MPI Spawn from within a Python script to launch HFODD runs. I've had some level of success. To pull this off, you needed to be able to launch several concurrent MPI tasks simultaneously, each with several OpenMP threads:
+
+\begin{verbatim*}
+Task 1 BB/__/__/__/__/__/__/__/__/__/__/__/__/__/__
+Task 2 __/__/__/__/__/BB/__/__/__/__/__/__/__/__/__
+Task 3 __/__/__/__/__/__/__/__/__/__/BB/__/__/__/__
+\end{verbatim*}
+
+That's all okay. We got that. Then you needed to spawn onto these processors. You were able to achieve something like that by using the option \texttt{--oversubscribe} (although it's not clear that the specially-designated processors were used properly). But the real issue is launching HFODD after that. To do it, you'd need to somehow launch another \texttt{srun} with a different number of \texttt{OMP\_NUM\_THREADS}. But to use MPI Spawn properly, you need the spawned process to establish, and later, disconnect from an MPI Communicator (otherwise the process will lag indefinitely). You could get around this by combining the two and spawning a process which calls a Python script (with the proper MPI communicators enabled and whatever) that launches an HFODD subprocess via \texttt{srun} (be sure to change the number of threads!). And you know, this might work... but at this point it's just seeming less and less reasonable. And I'm not sure you'd be spawning onto the correct, pre-reserved processors \textit{still}. I think you're better off in the long run just reserving a bunch of resources, and then launching a bunch of simultaneous \texttt{srun}s and letting the scheduler divide up the jobs itself. I feel like that's a lot simpler to implement, and probably a lot more portable in the end. To do \textit{this}, you'll need to write a Python script to handle the file management, and then refer to it in the batch script (you can do it in parallel still, I'm sure), followed by HFODD \texttt{srun}s, followed by either shell or Python file movement, followed by inertia \texttt{srun}s, followed by more file movement. So you might have 3 or 4 Python scripts: pre-HFODD, post-HFODD/pre-inertia, post-inertia, and a wrapper to write the batch script. That just feels so messy but it feels like the simplest way if you don't have the MPI Spawn (which was supposed to be the "One script to rule them all!"). I mean, I guess maybe the wrapper could write the other ones on the fly?
+
+Just to reiterate and make it clear, though: \textbf{Spawning a multithreaded executable}... actually might work, IF you had a specially-made executable just for that purpose. The question is whether it's worth modifying HFODD. So my question is, for a spawned process, do calls to \texttt{MPI\_COMM\_WORLD} refer to the communicator created by the spawn (i.e. \texttt{MPI\_GET\_PARENT}) or everything from before? I'm inclined to believe that it should just be the stuff you care about. So you could probably get it to work by just adding a few lines \texttt{MPI\_Comm\_get\_parent( parentcomm )} right after MPI\_INIT and \texttt{MPI\_Comm\_free( parentcomm )} right before MPI\_finalize (tucked inside some preprocessor option, of course). That might work... Okay, that's my goal for the end of the day. Compile a version of HFODD that is meant to be a worker in an MPI\_spawn, and see if you can get it to run.
+
+\noindent\textbf{UPDATE}
+
+...Okay, I am officially declaring \textbf{MPI Spawn NOT the solution} that I'm looking for. When I set up a test run, there was some error. I didn't have time to diagnose it yet when I talked to Kyle and he pointed out that mixing MPI implementations will lead to all kinds of crashes. That means that since my Fortran executable was built using the default system MVAPICH while my Python launch script was running from a side installation of mpi4py built over OpenMPI, they were going to have issues talking to each other (which is probably what I saw). So no, that's not gonna happen.
+
+\subsection*{10 April 2017}
+I decided I'm going to try doing things the easy way: just making one large resource allocation request, and in the script submitting several srun commands in the background and letting the scheduler figure out how to spread them out. I think that'll be the easiest and most portable in the long run. Right now the issue I'm having is that I'd like to define and launch those srun commands within a Python script; however, the resource allocation closes when the tasks in the script complete, and any jobs launched in the background by Python are disconnected from the batch script which launched Python, with the result that the scheduler \textit{thinks} that the job has finished even though there are tasks running in the background. I could get around that by having one thread just sleep for a really long time, but that would waste a thread and also it'd waste a lot of walltime if there really was a problem in the executable somewhere that caused it to close early.
+
+I ended up getting by it for the time being by just probing \texttt{ps} every 60 seconds, and if there is still an srun process running, the process sleeps for 60 seconds and tries again. I guess this isn't much better than having the one thread sleep for a long time since it still ties up a thread somewhere (which may or may not lead to a performance hit somewhere else? It's not resource intensive so it shouldn't be a big deal to multithread this on a processor with some other task...), but it does get you to within a minute of the actual execution time, so worst case scenario you waste about 59 seconds of walltime.
+
+And with that, I have a launch mechanism! Thank heavens I can move on now! Now to build the rest of that Python launch script (not to mention finishing up those point-based utilities)...
+
+And the nice thing is that this is fairly portable. For a system that uses mpirun/mpiexec instead of srun, you can chain jobs together like this:
+
+\begin{verbatim}
+shell$ mpirun -np 2 a.out : -np 2 b.out
+\end{verbatim}
+
+And in fact, you might even be able to do something fancier with srun by creating a MPMD config file:
+
+\noindent\verb|https://computing.llnl.gov/tutorials/linux_clusters/multi-prog.html|
+
+\subsection*{15 May 2017}
+
+This isn't part of the wrapper, per se, but it is relevant to the development of the ATDHFB inertia code, and specifically the temperature-dependent implementation of it. The $T>0$ version of the code ends up getting \textit{HUGE} values for the inertia, even for small temperatures like $T=0.05$ which should be almost unchanged from the $T=0$ case. It's not a matter of accidentally dividing by zero when $f_a=f_b$ because the code explicitly filters those out. It's about the relative sizes of $\dot{\mathcal{R}}$ and $f_a$, or actually $\frac{\partial \mathcal{R}}{\partial q}$ and $f_a$. The code calculates both of these based on the HFB matrices and the quasiparticle energies stored in the .QP files. For the test case I looked at (which was a sample case of $^{240}Pu$), $\frac{\partial \mathcal{R}}{\partial q}\sim 10^{-15}$ while $f_a$ can range from $f_a \sim 1-10^{-309}$ or so. So I doubt it's a matter of numerical instability in the $f_a$'s - the $E_a$'s from which the $f_a$'s derive are of the order $10^0-10^2$, after all - well within the working range of any double-precision arithmetic solver. Could it be a problem in the calculation of the derivatives and their densities that is making them accidentally several orders of magnitude larger than they should be? And my guess is no. Anything that produces an error or an instability in $\frac{\partial \mathcal{R}^{11}}{\partial q}$ would also produce a similar instability in $\frac{\partial \mathcal{R}^{12}}{\partial q}$ since they are built from the same things. The magnitudes of both are fairly similar ($\frac{\partial \mathcal{R}^{11}}{\partial q}$ is perhaps one or two orders of magnitude smaller than $\frac{\partial \mathcal{R}^{12}}{\partial q}$, which in this scheme is pretty insignificant), which doesn't mean they're correct but it \textit{does} lend plausibility to the idea that they might be. And presumably the off-diagonal terms are correct, since supposedly they were back when Jhilam first worked with the code.
+
+\subsection*{16 May 2017}
+
+The good news is that after talking to Nicolas, I've managed to reduce the order of magnitude of the resulting inertia from around $10^\infty$ to about $10^3$ by instituting a cutoff on all of the terms that get used to build up \verb|amass|. Numerical errors can start to creep in once you get past about 15 or so digits in a double-precision floating point number. In practice, that means that something with a power $a=x.xx\cdot10^{-15}$ might have just been a rounding error that should have been zero - or, in general, the rounding error is of the same order of magnitude as the number itself, and therefore we should probably just discard the whole thing as unreliable.
+
+So with a cutoff of $10^{-14}$ on everything (matrix elements, differences between $f_a$'s, etc.), we got \verb|-8.308560E+0003| when the T=0 calculation, by contrast, gave \verb|1.618428E-0002|. So not perfect still, definitely. But it's better than it was! And with that cutoff set to $10^{-13}$, the inertia drops even further to \verb|-3.917522E+0002|. So again, this cutoff is probably one important component to add, but it looks like there's probably something else going on. We can't just keep cutting off more and more data until we get what we want! At this level of detail we should \textit{definitely} be getting something reasonable.
+
+Worth noting, by the way, is that even though I don't have these results saved anywhere, I did a trial cutoff of $10^{-15}$. The result was very close to the real result: slightly smaller in magnitude, because certain terms were never added in thanks to the cutoff. But I didn't keep that result because it didn't include a single contribution from the $F^{11}, F^{22}$ terms (as they are referred to in the code, or $\frac{\partial\mathcal{R}^{11}_{0}}{\partial q_\nu}, \frac{\partial\mathcal{R}^{22}_{0}}{\partial q_\mu}$ as they are in my notes). So it was essentially cutting out any of the actual temperature dependence.
+
+For $T=1$ and cutoff$=10^{-13}$, the inertia I got was \verb|-2.075285E-0001|, which as far as I can tell is not unreasonable (except why is the sign negative?!).
+
+\subsection*{19 May 2017}
+
+Okay, here's sort of a summary table. $\delta q$ refers to the separation between points used to calculate the derivatives $\frac{\delta \mathcal{R}}{\delta q}$. The numerator cutoff refers to whether or not I truncated the numerator (the densities) to the same level that I truncated the $f_a-f_b$. On the one hand, you could claim they should be truncated because there's a lot of complicated expressions leading into them and you can't really trust the results beyond a certain point; on the other hand, these numbers aren't the ones that seem to be causing the problem - it's the $f_a$'s!
+
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+$\mathrm{Temp}$ & $\mathrm{cutoff}$ & $\mathrm{Numerator\ cutoff?}$ & $\delta q$ & $\mathcal{M}_{20,20}$ \\ \hline\hline
+0      &  none       & no   & 0.5  &  1.618428E-0002  \\\hline
+0      &  $10^{-13}$   & yes  & 0.01 &  1.549012E-0002  \\\hline
+0      &  $10^{-15}$   & yes  & 0.00001* &  0.000000E+0000  \\\hline
+0.005  &  $10^{-13}$   & yes  & 0.5  & -3.891427E+0002  \\\hline
+0.005  &  $10^{-13}$   & yes  & 0.01 & -1.417471E+0001  \\\hline
+0.005  &  $10^{-14}$   & no   & 0.5  & -8.471734E+0003  \\\hline
+0.005  &  $10^{-15}$   & no   & 0.5  & -1.452580E+0005  \\\hline
+0.005  &  $10^{-15}$   & yes  & 0.5  & -1.452580E+0005  \\\hline
+0.005  &  $10^{-15}$   & yes  & 0.00001*  & 1.450188E+0004  \\\hline
+1      &  $10^{-13}$   & no   & 0.5  & -2.075285E-0001  \\\hline
+1      &  $10^{-15}$   & no   & 0.5  & -2.003790E+0001  \\\hline
+\end{tabular}
+
+Sooo, another thing: it's probably significant that the $T=0$ inertia is positive, while all the rest of them are negative. Like, something's definitely up with that. [Repaired 30 May 2017]
+
+* See the note for 9 June 2017, below
+
+\subsection*{30 May 2017}
+I'd also just like to add (and I'm not sure how best to do it in the table so I'm listing it here separately) that I ran the code for entry 2 in the table with those same .QP files ($10^{-13}, \delta q=0.01$, numerator cutoff used), everything completely identical except that I artificially claimed that $T=0.05$. The resulting inertia was -1.413845E+0001.
+
+Then I fixed a sign error and changed conj(F11(mu,nu)) to F11(nu,mu), and the result I got was 1.416943E+0001.
+
+\subsection*{1 June 2017}
+
+Nicolas suggested a couple of things. One is that perhaps there's more to calculating $\delta \mathcal{R}(q,f(q))$ than you've currently got going on. Right now you basically ignore any variations in $\mathcal{R}$ with respect to $f$. That's a thing you could look into if you get stuck again, but since that means adding another term it seems somewhat unlikely that you would add a term that exactly cancels out to give you what you need.
+
+The other is that maybe the problem is really just numerical. When he computes the perturbative expression, there appears a term that ends up canceling the $f$'s in your denominator that are giving you all the trouble, but it's not clear where that would appear in the non-perturbative expression. Presumably that cancellation might exist somewhere, but it could be buried deep inside the computed densities, masked well within the numerical noise of those entities. He compared it to computing the limit $\lim\limits_{x\rightarrow0}\frac{sin(x)}{x}$: if you use the Taylor series expansion of $sin(x)$, then you should get nice convergence. But if you evaluate $sin(x)$ numerically ahead of time and then just divide, you might get something messy as a result.
+
+So we're just going to check it as nicely as we can, under the tightest conditions. We'll use a very small step size to compute the derivatives ($10^{-5}$), we'll let the iterations converge to a very tight convergence level ($10^{-9}$), and we'll do it at both $T=0$ and $T=0.005$. Then we'll see.
+
+\subsection*{9 June 2017}
+I'm not 100\% I should trust the entries in the table for $\delta q=0.00001$ because they didn't converge completely. I set a convergence parameter of $10^{-9}$ but HFODD quit and claimed ``chaotic divergence'' somewhere around the level of $10^{-7}$ or so.
+
+\subsection*{12 June 2017}
+As we continue to explore the orders-of-magnitude discrepancy in the temperature-dependent inertia tensor (which, according the the current code, jumps by something like $\sim 5$ orders of magnitude when you go from $T=0$ to $T=0.05$), Nicolas suggested first checking the convergence of the inertia as a function of $\delta q$. Then once we have a handle on that, we can start breaking other pieces down one-by-one. Right now it looks like going from $\delta q=10^{-1}$ to $\delta q=10^{-5}$, the magnitude of the inertia drops from about 1.646e-2 to 1.493e-5, which is roughly a 10\% drop. If we hold everything else constant, a 10\% error in the inertia leads to $\sim\sqrt{1.1}\approx1.0488$ or nearly a 5\% error in the action. That may not sound like much, but then you take the exponential to get the half-life. All in all, I carried it through just back-of-the-envelope style using a value for the action of 19.1 taken from Jhilam's paper as a ``typical'' value of the action, and a 5\% error in the action leads to an uncertainty factor of about 50 in the half-life. In other words, there's a range of not quite two orders of magnitude that are within your ``acceptable'' range for this level of precision in the inertia. I'm sure there's a good way to make this more rigorous, but there you go.
+
+\begin{tabular}{ccc}
+$S/S_{act}$ & $\tau_\frac{1}{2}$ & $\tau_\frac{1}{2}/\tau_{\frac{1}{2},act}$
+\\ \hline
+0.6 &	0.000000000025992915 &	0.0000002311960003 \\
+0.7 &	0.00000000118538631 &	0.00001054351056 \\
+0.8 &	0.0000000540586042 &	0.0004808284521 \\
+0.9 &	0.000002465299848 &	0.02192780089 \\
+0.95 &	0.00001664838879 &	0.1480803866 \\
+0.99 &	0.00007673158648 &	0.6824950532 \\
+1 &	0.0001124280478 &	1 \\
+1.01 &	0.0001647309344 &	1.465212085 \\
+1.05 &	0.0007592365904 &	6.753088799 \\
+1.1 &	0.005127192114 &	45.60420832 \\
+1.2 &	0.2338215373 &	2079.743817 \\
+1.3 &	10.6632461 &	94845.07026 \\
+1.4 &	486.2888963 &	4325334.343 \\
+
+
+\end{tabular}
+
+\subsection*{14 June 2017}
+I have a plot where I show the convergence of $\mathcal{M}$ as a function of $\delta q$ saved somewhere in my dudeman4 Google Drive, which I should probably pull out at some point. But another important thing to notice is that the solution diverged noticeably at $\delta q = 10^{-6}$. That may be because the HFODD density calculation terminated at the level $10^{-7}$. I'm going to test for that by pushing to a greater HFODD convergence level $10^{-8}$ and a tighter $\delta q = 10^{-7}$.
+
+Another thing to check is how much the density changes between the last and second-to-last iterations. Because you can figure those two iterations are both basically ``converged'', but it may be that some matrix elements in those densities change by a ``large'' amount (say, $10^{-5}$) between iterations. Essentially this means that there is effective numerical noise of order $10^{-5}$ (or whatever it ends up being) in the final resulting density, which means the precision we get when subtracting nearby densities to compute derivatives may be limited.
+
+My preliminary analysis suggests that this won't be an issue. I compared proton densities for the last and second-to-last iterations of some point that I picked out. I don't remember which one (I'm going to guess $\delta q = 10^{-7}$ but I could easily be wrong), but it looks like it doesn't matter anyway because the order of magnitude of the differences appears to be one or two below $\delta q$ at least. I checked a couple of different norms, but neither one seemed particularly threatening:
+
+\begin{verbatim}
+ l2rho= 2.138288179952028E-008
+ l2aka= 5.496113165431270E-009
+ maxrho= 1.393350374494798E-009
+ maxaka= 3.834180094000197E-010
+\end{verbatim}
+
+I'm redoing the entire calculation with a tighter convergence parameter and I just told it to print the second-to-last iteration, so we'll have all that information to look at in more detail soon enough.
+
+Something that might help reduce the error due to finite differences might be to do something totally different to compute the derivatives of the densities. One way to do this might be to use automatic differentiation. With automatic differentiation, the derivatives are computed at the same time as the quantities themselves (using the chain rule of the fundamental operations), and so at the end you get a derivative that is accurate to machine precision - \textit{waaaay} better than whatever you'd probably get from using finite differences. The downside to that is it would take a LOT of work to implement in HFODD (even with libraries that have been written).
+
+\subsection*{14 June 2017}
+I think I've had enough time to digest this, and now I'm ready to start speculating. It looks like the densities we compute in HFODD are probably accurate to within about 10\% of the convergence parameter (I should do some additional testing to confirm this, but it seems plausible). That makes sense, because that's roughly the level of fluctuations we see in \verb|E\_STAB| in the five iterations it takes for HFODD to declare the thing ``converged''. So this means that we can't probably trust our densities to any precision greater than, roughly speaking, the convergence parameter.
+
+So what does this mean for us? Specifically, what does this mean for our differentiation by finite differences with various sizes $\delta q$, and how does this change when we start dividing by our $f$s? I feel like there's a limit to the ``smallness'' of things we can actually divide by before it starts to turn into garbage, but what is it, exactly?
+
+I think it depends on the level of precision you need in your answer, of course, but let's look at some example cases. If you divide by something of the same order-of-magnitude as your noise, you would hope for a small number but instead you get something of order 1. That's not good! And worse, if you divide by something smaller than your noise, you're probably still hoping for a small answer (after all, $\delta \rho$ \textit{should} be small), but instead you get something \textit{significantly larger} than one. That's really not good!
+
+Now let's say you divide by a number roughly 100 times bigger than your noise (which, luckily, if it truly corresponds to our convergence parameter as I've supposed, is something we can estimate with a reasonable degree of certainty). Then you can expect to get something of order 0.01. That is, you can trust your answer to within about 1\%. If you're okay with that, then go for it. You know about what you need to do to get it.
+
+That's all fine, and it gives a handy prescription for knowing what level $\delta q$ to go for, given your convergence parameter. It also tells you what kind of precision you can expect in your final answer for the inertia. But now what do we do about finite temperature? Because that involves dividing by \textit{another} small number? I suspect the same things basically apply: your total denominator (the product of your two pieces) can only be so big compared to your numerator, and the precision of your final answer is essentially determined by the precision of your densities. But now my question is: by limiting the range of possible $f$s we can use, do we lose any essential physics?
+
+... I think my answer is that the physics just gets blurred out. All the $f$s you don't use just blend in to become numerical noise with all the rest.
+
+\subsection*{4 August 2017}
+I'm looking today into using Automatic Differentiation to replace the finite differences derivatives we currently compute to calculate the inertia. As I've shown previously, the finite differences approximation is (obviously) not perfect; furthermore, it's hard to have that done automatically. I have my Python script but I'm not convinced it's really that portable or efficient. It would be really neat to be able to compute the inertia correctly at runtime with the rest of the program and have it feature in the output file.
+
+As I see it, here are the challenges associated with such a thing:
+\begin{itemize}
+\item We'd need to compute derivatives with respect to multiple constraints, which are called in a loop. I don't know exactly how the AD software would compute derivatives, whether it finds a general form you can plug numbers into at the end or (more likely) propogates numbers throughout. Likewise, I don't know how it handles multiple parameters/variables. I'm sure that's not the biggest issue, but it's a potential issue.
+\subitem Although it might turn out that this is trivial. I'm not positive, but if the constraints only appear as a number that gets multiplied by an identity-like matrix and then added to the energy, and finally multiplied by the density, then it's pretty easy to predict its impact on the final result. It's just a linear relationship
+\item Then there's computing derivatives with respect to the $\lambda_2$ used in controlling the dynamical airing part. That's just one more piece that you wouldn't always need to do, but it would make setup just a bit more complicated.
+\subitem And it's conceivable that this is just as easy as the multipole constraint multipliers If that's the case, then I don't think we'd even need the mess of a full AD machinery. It seems you'd just do three matrix inversions in your last step instead of one (for a single derivative) and call it good. Wait, no, I'm still thinking finite difference-based numerical differentiation. This seems like something we could compute \textit{exactly}. Lemme think about it a bit more...
+\subitem Is this correct? And if so, is that inverse and subsequent multiplication something that would be computationally feasible? One objection I have is that all multipole moments would have the same derivative. There must be something I'm missing...
+\end{itemize}
+
+\begin{eqnarray}
+\mathcal{HR}_n+q\mathcal{IR}_n&=\mathcal{R}_{n+1}E \nonumber\\
+\frac{d\mathcal{R}_{n+1}}{dq} &= \mathcal{IR}_nE^{-1}
+\end{eqnarray}
+
+\begin{itemize}
+\item Whatever AD software we find needs to be able to handle several versions of Fortran
+\item It needs to be able to handle matrices
+\item Technically, we don't even compute the density in the program; that's not done until later. What gets put out in the QP file is only about half of what you need. Unless the full density is computed in the program and I just don't know about it, which is possible
+\item It would be best to only calculate the derivative at the last iteration, because I'm guessing it'll add a fairly high computational cost if we find the derivative after every iteration. That's a lot of iterations
+\end{itemize}
+
+\subsection*{4 August 2017}
+Another challenge associated with this derivative is that HFODD uses (I think by default) the Augmented Lagrangian Method for multipole constraints. This means that there is both a linear and a quadratic penalty term associated with each constraint. Or in other words, there is no easy way to exploit the form of the EDF to calculate the derivatives of the densities.
+
+I think I'm going to put the Automatic Differentiation thing on hold for now, unless I can find someone willing and able to walk me through it. It just seems like a lot of work and a whole lot of concepts I'm not familiar with for something that we can do almost as well and with less hassle.
+
+Maybe tomorrow I'll look into what it would take to add a finite-differences inertia subroutine/function during the last iteration of HFODD. You'd have to create a new row in the namelist and name a new set of QP files and output files. Those'll be the tricky part (though luckily you can probably copy and paste a lot of code from other places). The rest of it - starting a new set of HFB iterations within the HFB iterations - probably won't be that hard. You'll just have to create a new flag in the code to keep track of which neighbor point you're looking at.
+
+\subsection*{22 August 2017}
+For the time being I've decided against adding the inertia into the body of HFODD still. I'm torn on the pros and cons but the major pro is that it's probably less work to modify the stuff I already have. However, there are still challenges to be resolved. One is the following: in theory it should be possible to reserve an allotment of resources on Quartz and then break it into chunks and have each chunk do something different. This is the basis for the Python script I wrote. However, it hasn't worked the way I wanted, and after talking with the LC staff it turns out that at least one problem is that there is a minimum one node requirement for the size of your chunks; that is, you can't have multiple sruns per node. This throws a wrench in my plans, but I think we can get more or less around it by using the MANYCORES version of HFODD. We'll stretch out the jobs over a larger number of cores than originally planned, but hopefully it should finish faster by approximately the same factor. If the LC people get back to me and we can verify that this works, then I'm okay with it. It's still not pretty but it's better than nothing. And actually, if we do it this way and request fewer nodes than points in the PES (which we almost certainly will) then we should significantly improve the load balancing. Short of finding a way to compute the derivatives/inertia directly in HFODD, I think this is as good as we're gonna get.*
+
+*I thought about just doing every single neighboring point in one large HFODD run and then splitting that all up later, but apart from being a lot to rewrite and having poor load-balancing, there's the issue of each point having a different quadrupole deformation (hence basis). So it couldn't really work except in strips of just one $Q_{20}$ value.
+
+The next issue is that of computing the derivatives with respect to the pairing parameter. That's going to require an additional HFODD run in each direction ($\pm\delta\lambda$). First of all you'll need an HFODD executable that respects the \texttt{LAMBDA2} values that you try to give it. Given that, you can split the PES into individual points like you do in the case of the multipole constraints, but it might just be easier to do the entire layer as a complete HFODD run. It might be worth checking to see how much time it takes, and 
+
+\subsection*{28 August 2017}
+I'm really starting to think that the best long-term solution will be to just add the non-perturbative cranking as a subroutine in HFODD. You can specify the directions of the derivatives kind of like you do with when you choose the constraints, and you can even throw pairing in there as a constraint direction. You'll have to come up with a naming scheme for the outputs for those supplemental files (and you'll have to decide how many of them you want to keep, if any). And it might actually be really tricky to do an HFODD run from \textit{inside} HFODD. That's probably going to be the hardest part, actually. AND you're going to have to override the automatic basis somehow with one of your own choosing (to make sure you use the same basis as the original point). I think some of those things can be managed by just throwing a flag in there that turns on when you're doing a neighbor point instead of a centerpoint.
+
+For the short-term, though, maybe it would be best, given the number of constraints we have - not to mention the time constraint - to more or less follow the Python thang. You've got 3 constraints $\rightarrow$ 6 neighbors (not counting pairing, which we can do in bulk). To maximize use of the nodes, that means using 6 processors per task (perhaps 3 MPI ranks per task since there are 3 constraints, with 2 OpenMP threads?). That means you're going to need as many nodes reserved as you have points in your PES - which is a LOT of nodes. Quartz has 2688 nodes; you have something like 2000 points \textit{per value of} $\lambda$! That means reserving all of Quartz for 2 hours times the number of pairing layers! It might be a bit faster since we're using the MANYCORES option, but still. I think you'd really need to break this down somehow, but I'm not sure of a good way to do it. Since pairing will have to be computed separately, you'll have to do the inertia separately, too.
+
+\subsection*{11 September 2017}
+I'm trying to figure out how to compute some kind of analytic or ``analytic'' derivative to the density from within the framework of HFODD. In the git code I have on my system, I'm looking through to find the instances of the variable \texttt{QASKED}, which stores the values you request for constrained multipole moments. The density will depend on those values somehow. And for some reason I have a file containing the variable \texttt{COFMUL}. It's been a few days and I'm not sure what that does anymore, though (see the explanation in the MOMETS subroutine).

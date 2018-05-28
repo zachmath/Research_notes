@@ -1,0 +1,29 @@
+\chapter{How to compute half-lives}
+\maketitle
+
+\subsection*{20 June 2017}
+I'm trying to think about things to do to improve the half-life calculation. I talked a bit before (I think) about how small changes in the factor $\delta q$ used for the finite-difference approximation of the derivatives we need to compute the inertia can eventually lead to errors as great as two orders of magnitude in the half-life. And just in general, half-life calculations are not notoriously great. So what can we do to nail down some better certainties there? Well, hammering down on the precision of those derivatives is a good start (and it seems like it might provide a way to estimate uncertainties).
+
+Another possible fix might be to adjust that factor $n=10^{20.38} s^{-1}$ that just gets taken for granted. It could be that it's a good estimate, but that's something I'd like to decide for myself. I bet we could come up with a better estimate that is elongation-dependent (or perhaps even more complicated, but that seems like the best next-to-leading-order approximation).
+
+A third possible space for improvement is with the WKB approximation. The WKB approximation breaks down near the turning points. There are people on the internet who have devised workarounds:
+
+\begin{enumerate}
+\item \href{http://www.physicspages.com/2014/07/03/wkb-approximation-tunneling/}{Derivation of WKB approximation}
+\item \href{http://www.physicspages.com/2014/06/30/wkb-approximation-alternative-derivation/}{Alternative derivation of WKB approximation}
+\item \href{http://www.physicspages.com/2014/07/09/wkb-approximation-turning-points/}{WKB at turning points}
+\item \href{http://www.physicspages.com/2014/07/14/wkb-approximation-at-a-turning-point-with-decreasing-potential/}{WKB at a turning point with decreasing potential}
+\end{enumerate}
+
+\noindent One nice thing about the WKB approximation is that since it is based on a series expansion, you can estimate errors: \href{https://en.wikipedia.org/wiki/WKB_approximation#Precision_of_the_asymptotic_series}{WKB on Wikipedia}
+
+Yet another idea is to avoid the WKB approximation altogether. You could model the barrier as a series of rectangular barriers, for which you know the exact transmission probability. The total transmission probability through the whole barrier is then the product of all the individual, infinitesimal rectangular barriers. You'd need to use a ``product integral'' instead of the usual summation integral, and even then I'm not sure you could generate an analytic expression without knowing the analytic form of the potential. But numerically, I think you'd actually be fine, come to think of it. You could basically just change or add a couple of extra terms to your path program and I think it would work just fine. In fact, once I get the path program working, I think I'll do just that!
+
+\subsection*{29 June 2017}
+Just to make sure I have it somewhere, the formula for computing the tunneling probability through a rectangular barrier of width $a$ is
+
+\begin{equation}
+T = \frac{1}{1+\frac{V_0^2\sinh^2(k_1a)}{4E(V_0-E)}}, \qquad k_1 = \sqrt{\frac{2m(V_0-E)}{\hbar^2}}
+\end{equation}
+
+I'm not sure whether this only works for the case $E>0$. It'd be nice, on the one hand, to rescale everything to some zero-point energy defining your ground state. But then your particle has zero energy, which removes all the interestingness of the expression.
