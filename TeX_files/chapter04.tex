@@ -212,3 +212,16 @@ We discovered a problem with my data: that I was using $E_{HFB}+E_{LN}$ instead 
 \end{list}
 
 \noindent I can't get a 3D calculation (or not a correct one) using the data I have. Because of the way I did my calculations, if I limit myself to $\lambda_2=0$, then I automatically impose $q_{22}=0$ as well. That's not actually true, but what is true is that I don't have any $q_{22}$ inertias for $\lambda_2=0$ for some reason.
+
+\subsection*{30 May 2018}
+I have a couple of things to report today. First, if you look back at today's note in the chapter about optimizing the basis you'll see that we may need to redo the Mq20q20 calculations because we tried to combine densities corresponding to different single particle levels... My bad.
+
+But second, and more interesting (if it continues to hold later) is that when I use Jhilam's finer mesh for Langevin, I am not getting a lone peak centered at $^{208}$Pb, but rather a peak centered around Z=81, A=205-206, \textit{and a second peak} centered around Z=66, A=166. This is using fragm\_int and mass\_int files given to me from Jhilam's finely-interpolated data, and the wkb file generated (technically, modified) from my previous coarsely-interpolated data (the outer turning line is slightly different, perhaps owing to the different choice of $E_0$, but the trend is roughly the same, and the old file includes a lot more outer turning points for some reason [I suspect owing to changes I made in the action code]). Why dysprosium-166? Beats me. I'd have to check the effective fission paths, which do not print properly in the MPI code (is there some kind of weird race condition?).
+
+\subsection*{5 June 2018}
+One thing that I'm noticing from my Langevin calculations is that the effective fission paths I seem to be getting all originate from points that have quite large $q_{30}$. I suspect (though admittedly I don't know for sure) that this is because of the time cutoff. Jhilam mentioned yesterday that perhaps we should start trajectories from the center of the ``slide,'' and not from the exact OTP. Because what ends up happening (probably, but again I haven't checked this) is that the slide is shallow, but with steep slides, so that rather than falling to the middle of the slide and going down the slide, trajectories just bounce back and forth from side to side across the top of the slide. There are two ways you could check this: one would be to print the coordinate at every time step ($\rightarrow$ huge data file), or you could increase the maximum number of time steps per trajectory (time-consuming, with no guarantee of convergence).
+
+I think this might really matter, too. Because right now we're getting an almost equal contribution from symmetric-ish and cluster channels. But I sort of suspect, based totally on hand-wavey semiclassical argument that the closer you start to the minimum action path, the stronger the contribution from cluster emission.
+
+\subsection*{6 June 2018}
+Something to notice (and maybe make a note in the hsi archive) is that the HFB1 force was incorrect/contained a typo up until July of last year. I fixed it, but now I need to be sure which force was used for which point. It seems to matter in at least some cases.

@@ -96,3 +96,20 @@ Okay, I have information about the basis Jhilam apparently used: for $Q_{20}=77$
 It seems there's no problem with the $\lambda$ terms in the inertia output (at least, not one unique to just the pairing terms).  The issue there is that Jhilam normalized his coordinates in the end, such that $\delta x=1$ for every collective coordinate instead of the $d\lambda=0.01$ I'm using. Since this only affects the denominator in my derivatives $\frac{\delta \rho}{\delta q}$, this means shifting the decimal point over by 2 slots (or 4 in the $\lambda-\lambda$ case) for the pairing terms.
 
 So it $\mathit{looks}$ like the inertia code is working. Everything is correct to within ~20\% compared to Jhilam's result. But it would be good to make absolutely sure, which means examining Jhilam's output files, if possible. 
+
+\subsection*{30 May 2018}
+After all this, it would appear that I forgot it completely when it came time to compute the inertias for oganesson 294. I had planned to do runs for small neighborhoods around each point, and use that small spacing to do the finite differences for the inertia calculation. But when it came time, I felt pressured to find results, forgot about the different single-particle levels when you use a different basis deformation, and tried to mix incompatible densities. Consequently, my Mq20q20 values are garbage... Not to mention the fact that I didn't use Broyden even though I probably could have (and saved a lot of computer time in the process), and the inertias calculated with such a large spacing can't be expected to be super-reliable anyway.
+
+FUTURE GOAL: Before starting any kind of DFT run, keep a record somewhere with the input file you use, AND COMMENT ON EACH FIELD to justify the approximations you used and why. This should force you to go through and think about what kinds of improvements you can make to the calculation ahead of time, if you do it right, and should help you keep things straight when you have long-term, multistep problems like you do now.
+
+Next thing on the to-do list is to go through and do the fine-grained inertia calculations you originally had planned to do on some sample 2D surface. Get a feel for how long that takes, do the perturbative cranking and Broyden while you're at it, and then maybe move onto the region outside the barrier where Langevin is affected.
+
+\subsection*{1 June 2018}
+One of the biggest bummers right now with the ``nearby neighborhoods'' thang is that you have to do a separate HFODD process for each point neighborhood. And since you can only launch one MPI job per node, you can't lump several HFODD runs onto a single compute node, which means you're really just wasting all of those computational resources \textit{and} you need several small subfolders instead of one massive folder (which in this case would actually make things nicer). You can avoid that, however, by creating a custom HFODD executable that simply rounds to the nearest integer in the subroutine ADJBAS. $\rightarrow$ My special executable seems to have done the trick, at least for my test case! I just changed the following line in ADJBAS:
+
+\begin{verbatim}
+!      Q2_VAL=ABS(QASKED(2,0))
+Q2_VAL=ABS(REAL(NINT(QASKED(2,0))))
+\end{verbatim}
+
+Just to test how necessary this was, I'm also doing a quick run without my modified ADJBAS, and just hoping that the two bases are close enough for a smooth restart. And actually, for my sample with $\delta q_{20}=0.001$, it doesn't seem to be a huge deal. It went from ESTAB=-0.025018 in the first case to ESTAB=-0.026751 in the second. So it is indeed better with the rounded ADJBAS, but in this particular case (which, admittedly, is already starting from a fairly-converged REC file), the improvement is small enough that it might not be worthwhile in general. But what I conclude from this is that, one way or another, I have an acceptable way of computing several points in the same HFODD run!
