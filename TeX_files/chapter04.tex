@@ -225,3 +225,15 @@ I think this might really matter, too. Because right now we're getting an almost
 
 \subsection*{6 June 2018}
 Something to notice (and maybe make a note in the hsi archive) is that the HFB1 force was incorrect/contained a typo up until July of last year. I fixed it, but now I need to be sure which force was used for which point. It seems to matter in at least some cases.
+
+\subsection*{27 June 2018}
+I just want to make some notes regarding the trajectories I'm recovering with my various inertias:
+
+In the non-perturbative case, I had to filter out some (I assume) artificially-large inertia values that were creating all kinds of problems with the trajectories. I introduced a filter in my Python interpolation script that cuts off any component of the inertia larger than 1 (is that a reasonable cutoff? I dunno, but it didn't seem to make much of a difference whether I used 1 or 1000).
+
+To delineate scission, I used qN=7.
+
+Just judging from the cases where I use 100 trajectories per OTP to generate an effective fission path, the GCM trajectories all go to the cluster channel; ATDHF go either to the cluster channel or bounce around the symmetric channel; and the ATDHFB-np trajectories go all over the place. Weird.
+
+\subsection*{28 June 2018}
+I'm not sure what caused the jobs to just end early (it claims to have something to do with line 463: ``kount = kount+1'', but I feel like there's something deeper at play here...). Nevertheless, most of the outer turning points have done at least something, and I have data that could give me an actual distribution. So now the question I have to puzzle though is: if I just use the data I have now, even though I'm missing some of the OTPs I'd planned to use (or some of them are undersampled), am I still getting a good estimate of the distribution? On the one hand, I'm already just sampling discrete points on a continuous OTL, and I presume we just assume that's a good representation of the whole thing. In fact, that might be partly why we convolute with a Gaussian later on. But now I'm thinking: is it really a good idea to just lump the fragments together, multiplying their multiplicity by the action-based probability with which they were generated? I worry that doing it this way, you could have many trajectories from a distant point on the OTL overwhelming a single contribution from the minimum-action path exit point. $\rightarrow$ I think the right way to handle that is to make sure each OTP has the same number of trajectories emanating from it. Those trajectories can do what they want, but then each point gets equal weight. - I think if I can hard-code the OTP arrays into the Langevin code (instead of letting it come up with an OTL on its own), then I can make it only redo the calculation for the points I care about.
